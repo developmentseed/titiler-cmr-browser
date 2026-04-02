@@ -1,4 +1,4 @@
-# titiler-cmr Showcase
+# titiler-cmr-browser
 
 A minimal map application showcasing [titiler-cmr](https://developmentseed.org/titiler-cmr)'s data rendering capability, hosted on GitHub Pages.
 
