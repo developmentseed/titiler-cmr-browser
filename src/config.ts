@@ -131,49 +131,6 @@ export const DATASETS: DatasetConfig[] = [
     label: "HLS (Harmonized Landsat Sentinel-2)",
     collection: [
       {
-        label: "HLSL30 (Landsat 8/9)",
-        collectionConceptId: "C2021957657-LPCLOUD",
-        assetsRegex: "B[0-9][0-9]",
-        minzoom: 5,
-        maxzoom: 13,
-        backend: "rasterio",
-        attribution: '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
-        date: { mode: "month" },
-        queryParams: [
-          {
-            type: "range",
-            label: "Cloud Cover (%)",
-            key: "cloud_cover",
-            min: 0,
-            max: 100,
-            step: 1,
-            default: [0, 100],
-          },
-        ],
-        renders: [
-          {
-            label: "True Color",
-            assets: ["B04", "B03", "B02"],
-            params: {
-              color_formula:
-                "Gamma RGB 3.5 Saturation 1.2 Sigmoidal RGB 15 0.35",
-              sort_key: "cloud_cover",
-              exitwhenfull: "true",
-            },
-          },
-          {
-            label: "False Color (NIR)",
-            assets: ["B05", "B03", "B02"],
-            params: {
-              color_formula:
-                "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
-              sort_key: "cloud_cover",
-              exitwhenfull: "true",
-            },
-          },
-        ],
-      },
-      {
         label: "HLSS30 (Sentinel-2)",
         collectionConceptId: "C2021957295-LPCLOUD",
         assetsRegex: "B[0-9][0-9A-Za-z]",
@@ -207,6 +164,49 @@ export const DATASETS: DatasetConfig[] = [
           {
             label: "False Color (NIR)",
             assets: ["B8A", "B03", "B02"],
+            params: {
+              color_formula:
+                "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
+              sort_key: "cloud_cover",
+              exitwhenfull: "true",
+            },
+          },
+        ],
+      },
+      {
+        label: "HLSL30 (Landsat 8/9)",
+        collectionConceptId: "C2021957657-LPCLOUD",
+        assetsRegex: "B[0-9][0-9]",
+        minzoom: 5,
+        maxzoom: 13,
+        backend: "rasterio",
+        attribution: '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
+        date: { mode: "month" },
+        queryParams: [
+          {
+            type: "range",
+            label: "Cloud Cover (%)",
+            key: "cloud_cover",
+            min: 0,
+            max: 100,
+            step: 1,
+            default: [0, 100],
+          },
+        ],
+        renders: [
+          {
+            label: "True Color",
+            assets: ["B04", "B03", "B02"],
+            params: {
+              color_formula:
+                "Gamma RGB 3.5 Saturation 1.2 Sigmoidal RGB 15 0.35",
+              sort_key: "cloud_cover",
+              exitwhenfull: "true",
+            },
+          },
+          {
+            label: "False Color (NIR)",
+            assets: ["B05", "B03", "B02"],
             params: {
               color_formula:
                 "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
@@ -278,7 +278,7 @@ export const DATASETS: DatasetConfig[] = [
       collectionConceptId: "C1996881146-POCLOUD",
       backend: "xarray",
       minzoom: 0,
-      maxzoom: 7,
+      maxzoom: 13,
       attribution: '<a href="https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1" target="_blank">MUR SST (NASA JPL PO.DAAC)</a>',
       date: { mode: "single" },
       renders: [
