@@ -19,6 +19,21 @@ export type ControlState = {
   extraParams: Record<string, string | string[]>;
 };
 
+/** Initial values used to pre-populate controls (e.g. restored from URL hash). */
+export interface InitialValues {
+  datasetId?: string;
+  collectionId?: string;
+  renderIdx?: number;
+  /** Raw date input value for single/month date modes. */
+  date?: string;
+  /** Raw start date for range date mode. */
+  start?: string;
+  /** Raw end date for range date mode. */
+  end?: string;
+  /** Extra query param values keyed by param key (in their serialized form). */
+  extraParams?: Record<string, string | string[]>;
+}
+
 /**
  * Computes a smart default date value based on mode and the current date.
  * Used when `date.default` is not set on a collection's DateConfig.
@@ -82,11 +97,13 @@ function makeDateInput(id: string): HTMLInputElement {
 /**
  * Clears `container` and renders one or two date inputs based on `collection.date.mode`.
  * Returns a getter that produces the correct `datetime` query string.
+ * If `initialValue` is provided it overrides the collection's default date.
  */
 function renderDateControls(
   container: HTMLElement,
   collection: CollectionConfig,
-  onChange: () => void
+  onChange: () => void,
+  initialValue?: string | [string, string]
 ): () => string {
   const today = new Date();
   const todayYMD = today.toISOString().slice(0, 10);
@@ -100,7 +117,7 @@ function renderDateControls(
     const fallback = computeDefaultDate(collection.date) as string;
     const defaultVal = collection.date.default ?? fallback;
     const input = makeDateInput("date-input");
-    input.value = defaultVal;
+    input.value = (initialValue as string | undefined) ?? defaultVal;
     input.max = todayYMD;
     input.addEventListener("change", onChange);
     container.appendChild(makeLabel("Date", "date-input"));
@@ -120,7 +137,7 @@ function renderDateControls(
     const input = document.createElement("input");
     input.type = "month";
     input.id = "month-input";
-    input.value = defaultMonth;
+    input.value = (initialValue as string | undefined) ?? defaultMonth;
     input.max = todayYM;
     input.addEventListener("change", onChange);
     container.appendChild(makeLabel("Month", "month-input"));
@@ -134,10 +151,14 @@ function renderDateControls(
   } else {
     const fallback = computeDefaultDate(collection.date) as [string, string];
     const [defaultStart, defaultEnd] = collection.date.default ?? fallback;
+    const [initialStart, initialEnd] = (initialValue as [string, string] | undefined) ?? [
+      defaultStart,
+      defaultEnd,
+    ];
     const startInput = makeDateInput("start-date-input");
     const endInput = makeDateInput("end-date-input");
-    startInput.value = defaultStart;
-    endInput.value = defaultEnd;
+    startInput.value = initialStart ?? defaultStart;
+    endInput.value = initialEnd ?? defaultEnd;
     startInput.max = todayYMD;
     endInput.max = todayYMD;
     startInput.addEventListener("change", onChange);
@@ -166,11 +187,13 @@ function renderDateControls(
 /**
  * Renders a range param as two number inputs.
  * Returns a getter that produces [key, "min,max"].
+ * If `initialValue` is provided as "min,max" it overrides the param default.
  */
 function renderRangeParam(
   container: HTMLElement,
   param: RangeQueryParam,
-  onChange: () => void
+  onChange: () => void,
+  initialValue?: string
 ): () => [string, string] {
   const wrapper = document.createElement("div");
   wrapper.className = "range-param";
@@ -198,6 +221,12 @@ function renderRangeParam(
   const minInput = makeNum(param.default[0], `extra-${param.key}-min`);
   const maxInput = makeNum(param.default[1], `extra-${param.key}-max`);
 
+  if (initialValue) {
+    const parts = initialValue.split(",");
+    if (parts[0] !== undefined) minInput.value = parts[0];
+    if (parts[1] !== undefined) maxInput.value = parts[1];
+  }
+
   const sep = document.createElement("span");
   sep.textContent = "–";
   sep.className = "range-sep";
@@ -215,11 +244,14 @@ function renderRangeParam(
  * Renders an attribute filter param as a select or text input.
  * Returns a getter that produces [key, value | null].
  * null means "omit this filter".
+ * If `initialValue` is provided (serialized as "attributeType,attributeName,value")
+ * it overrides the param default.
  */
 function renderAttributeParam(
   container: HTMLElement,
   param: AttributeQueryParam,
-  onChange: () => void
+  onChange: () => void,
+  initialValue?: string
 ): () => [string, string | null] {
   const id = `extra-attr-${param.attributeName}`;
   const serialized = (v: string) =>
@@ -234,6 +266,14 @@ function renderAttributeParam(
       if (opt.value === param.default) el.selected = true;
       select.appendChild(el);
     }
+    if (initialValue) {
+      // initialValue is serialized; extract the raw value after "type,name,"
+      const parts = initialValue.split(",");
+      const rawValue = parts.slice(2).join(",");
+      if (Array.from(select.options).some((o) => o.value === rawValue)) {
+        select.value = rawValue;
+      }
+    }
     select.addEventListener("change", onChange);
     container.appendChild(makeLabel(param.label, id));
     container.appendChild(select);
@@ -247,6 +287,12 @@ function renderAttributeParam(
     input.id = id;
     input.placeholder = "No filter";
     input.value = param.default ?? "";
+    if (initialValue) {
+      // For text-based attribute params the stored value is the serialized form;
+      // extract the raw value after "type,name,"
+      const parts = initialValue.split(",");
+      input.value = parts.slice(2).join(",");
+    }
     input.addEventListener("change", onChange);
     container.appendChild(makeLabel(param.label, id));
     container.appendChild(input);
@@ -260,11 +306,13 @@ function renderAttributeParam(
 /**
  * Renders all extra query param controls into `container`.
  * Returns a function that collects their current values.
+ * If `initialValues` is provided, controls are pre-populated with those values.
  */
 function renderExtraParams(
   container: HTMLElement,
   queryParams: QueryParamConfig[],
-  onChange: () => void
+  onChange: () => void,
+  initialValues?: Record<string, string | string[]>
 ): () => Record<string, string | string[]> {
   container.innerHTML = "";
   if (queryParams.length === 0) return () => ({});
@@ -274,10 +322,14 @@ function renderExtraParams(
 
   for (const param of queryParams) {
     if (param.type === "range") {
-      const g = renderRangeParam(container, param, onChange);
+      const stored = initialValues?.[param.key];
+      const initial = Array.isArray(stored) ? stored[0] : stored;
+      const g = renderRangeParam(container, param, onChange, initial);
       getters.push(() => g());
     } else if (param.type === "attribute") {
-      getters.push(renderAttributeParam(container, param, onChange));
+      const stored = initialValues?.["attribute"];
+      const initial = Array.isArray(stored) ? stored[0] : stored;
+      getters.push(renderAttributeParam(container, param, onChange, initial));
     } else if (param.type === "select") {
       const id = `extra-${param.key}`;
       const select = makeSelect(id);
@@ -287,6 +339,11 @@ function renderExtraParams(
         el.textContent = opt.label;
         if (opt.value === param.default) el.selected = true;
         select.appendChild(el);
+      }
+      const stored = initialValues?.[param.key];
+      const initial = Array.isArray(stored) ? stored[0] : stored;
+      if (initial !== undefined && Array.from(select.options).some((o) => o.value === initial)) {
+        select.value = initial;
       }
       select.addEventListener("change", onChange);
       container.appendChild(makeLabel(param.label, id));
@@ -299,6 +356,9 @@ function renderExtraParams(
       input.type = "text";
       input.id = id;
       input.value = param.default;
+      const stored = initialValues?.[param.key];
+      const initial = Array.isArray(stored) ? stored[0] : stored;
+      if (initial !== undefined) input.value = initial;
       input.addEventListener("change", onChange);
       container.appendChild(makeLabel(param.label, id));
       container.appendChild(input);
@@ -330,10 +390,16 @@ function renderExtraParams(
 
 /**
  * Mounts the controls panel and wires up all interactions.
- * Returns a `getState` function for reading current control values.
+ * Returns `getState` for reading current control values and `getUrlMeta` for
+ * reading dataset/render identifiers needed to encode URL state.
+ * If `initial` is provided, controls are pre-populated on first load.
  */
-export function initControls(onChange: (state: ControlState) => void): {
+export function initControls(
+  onChange: (state: ControlState) => void,
+  initial?: InitialValues
+): {
   getState: () => ControlState;
+  getUrlMeta: () => { datasetId: string; renderIdx: number };
 } {
   const container = document.getElementById("controls")!;
   const toggleBtn = document.getElementById("controls-toggle")!;
@@ -392,6 +458,9 @@ export function initControls(onChange: (state: ControlState) => void): {
   let readDatetime: () => string = () => "";
   let readExtraParams: () => Record<string, string | string[]> = () => ({});
 
+  // Tracks whether the initial URL values have been applied during bootstrap.
+  let initialApplied = false;
+
   // --- Dataset/collection/render helpers ---
 
   function getCollections(dataset: DatasetConfig): CollectionConfig[] {
@@ -408,6 +477,12 @@ export function initControls(onChange: (state: ControlState) => void): {
       opt.textContent = ds.label;
       datasetSelect.appendChild(opt);
     }
+    if (initial?.datasetId) {
+      const found = Array.from(datasetSelect.options).some(
+        (o) => o.value === initial.datasetId
+      );
+      if (found) datasetSelect.value = initial.datasetId;
+    }
   }
 
   function getSelectedDataset(): DatasetConfig {
@@ -421,6 +496,12 @@ export function initControls(onChange: (state: ControlState) => void): {
       opt.value = col.collectionConceptId;
       opt.textContent = col.label;
       collectionSelect.appendChild(opt);
+    }
+    if (!initialApplied && initial?.collectionId) {
+      const found = getCollections(dataset).some(
+        (c) => c.collectionConceptId === initial.collectionId
+      );
+      if (found) collectionSelect.value = initial.collectionId;
     }
   }
 
@@ -460,11 +541,37 @@ export function initControls(onChange: (state: ControlState) => void): {
   function onCollectionChange(): void {
     const collection = getSelectedCollection(getSelectedDataset());
     populateRenders(collection);
-    readDatetime = renderDateControls(primary, collection, () => onChange(getState()));
+
+    let dateInitial: string | [string, string] | undefined;
+    let extraParamsInitial: Record<string, string | string[]> | undefined;
+
+    if (!initialApplied && initial) {
+      if (
+        initial.renderIdx !== undefined &&
+        initial.renderIdx < collection.renders.length
+      ) {
+        renderSelect.value = String(initial.renderIdx);
+      }
+      if (initial.date) {
+        dateInitial = initial.date;
+      } else if (initial.start && initial.end) {
+        dateInitial = [initial.start, initial.end];
+      }
+      extraParamsInitial = initial.extraParams;
+      initialApplied = true;
+    }
+
+    readDatetime = renderDateControls(
+      primary,
+      collection,
+      () => onChange(getState()),
+      dateInitial
+    );
     readExtraParams = renderExtraParams(
       extraParamsContainer,
       collection.queryParams ?? [],
-      () => onChange(getState())
+      () => onChange(getState()),
+      extraParamsInitial
     );
     details.open = (collection.queryParams?.length ?? 0) > 0;
     infoBtn.onclick = () => showCollectionDetails(collection);
@@ -478,5 +585,11 @@ export function initControls(onChange: (state: ControlState) => void): {
   populateDatasets();
   onDatasetChange();
 
-  return { getState };
+  return {
+    getState,
+    getUrlMeta: () => ({
+      datasetId: datasetSelect.value,
+      renderIdx: parseInt(renderSelect.value ?? "0", 10),
+    }),
+  };
 }
