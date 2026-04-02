@@ -67,9 +67,15 @@ function addRasterLayer(
   id: string,
   tilejsonUrl: string,
   minzoom: number,
-  maxzoom?: number
+  maxzoom?: number,
+  attribution?: string
 ): void {
-  map.addSource(id, { type: "raster", url: tilejsonUrl, tileSize: 256 });
+  map.addSource(id, {
+    type: "raster",
+    url: tilejsonUrl,
+    tileSize: 256,
+    ...(attribution ? { attribution } : {}),
+  });
   map.addLayer({
     id,
     type: "raster",
@@ -96,11 +102,11 @@ export function updateLayer(map: Map, state: ControlState): void {
       p.set("minzoom", String(sub.minzoom));
       if (sub.maxzoom !== undefined) p.set("maxzoom", String(sub.maxzoom));
       for (const [k, v] of Object.entries(sub.params)) p.set(k, v);
-      addRasterLayer(map, `cmr-${i}`, `${base}?${p}`, sub.minzoom, sub.maxzoom);
+      addRasterLayer(map, `cmr-${i}`, `${base}?${p}`, sub.minzoom, sub.maxzoom, collection.attribution);
     });
   } else {
     const p = buildBaseParams(collection, render, datetime, extraParams);
     p.set("minzoom", String(collection.minzoom));
-    addRasterLayer(map, "cmr-0", `${base}?${p}`, collection.minzoom);
+    addRasterLayer(map, "cmr-0", `${base}?${p}`, collection.minzoom, undefined, collection.attribution);
   }
 }

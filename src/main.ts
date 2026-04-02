@@ -28,6 +28,15 @@ const { getState } = initControls((state) => {
 
 map.on("load", () => {
   map.setProjection({ type: "globe" });
+  map.setSky({
+    "sky-color": "#0d1117",
+    "horizon-color": "#1a2233",
+    "fog-color": "#0d1117",
+    "fog-ground-blend": 0.9,
+    "horizon-fog-blend": 0.5,
+    "sky-horizon-blend": 0.5,
+    "atmosphere-blend": 0.3,
+  });
   initLoading(map, () => getState().collection.minzoom);
   initZoomGuard(map, () => getState().collection.minzoom);
   updateLayer(map, getState());

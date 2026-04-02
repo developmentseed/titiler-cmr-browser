@@ -19,6 +19,7 @@ body {
 #map {
   position: absolute;
   inset: 0;
+  background: #0d1117;
 }
 
 /* Mobile toggle button (hidden on desktop) */
@@ -142,6 +143,7 @@ body {
 }
 
 #controls input[type="date"],
+#controls input[type="month"],
 #controls input[type="text"] {
   width: 100%;
   background: rgba(255, 255, 255, 0.08);
@@ -155,6 +157,7 @@ body {
 
 #controls select:focus,
 #controls input[type="date"]:focus,
+#controls input[type="month"]:focus,
 #controls input[type="text"]:focus {
   outline: 1px solid rgba(100, 160, 255, 0.6);
 }
@@ -198,6 +201,22 @@ body {
   color: #666;
   font-size: 13px;
   flex-shrink: 0;
+}
+
+/* Logo */
+#logo {
+  position: absolute;
+  bottom: 36px;
+  left: 12px;
+  z-index: 10;
+}
+
+#logo img {
+  display: block;
+  height: 48px;
+  width: auto;
+  border-radius: 6px;
+  opacity: 0.9;
 }
 
 /* Zoom guard */

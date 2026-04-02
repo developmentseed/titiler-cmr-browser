@@ -26,10 +26,12 @@ export type RenderConfig = {
  * Controls the date picker UI and how the `datetime` query param is formed.
  * - `single`: one date input; datetime sent as a single-day range.
  * - `range`: two date inputs (start / end).
+ * - `month`: a single month/year picker; datetime sent as the full calendar month range.
  */
 export type DateConfig =
   | { mode: "single"; default: string }
-  | { mode: "range"; default: [string, string] };
+  | { mode: "range"; default: [string, string] }
+  | { mode: "month"; default: string };
 
 /**
  * A numeric range input rendered as two number fields (min, max).
@@ -91,6 +93,8 @@ export type CollectionConfig = {
   minzoom: number;
   maxzoom: number;
   backend: "rasterio" | "xarray";
+  /** HTML string shown in the MapLibre attribution control for this layer. */
+  attribution?: string;
   /** Controls the date picker UI and the datetime query param format. */
   date: DateConfig;
   renders: RenderConfig[];
@@ -124,7 +128,8 @@ export const DATASETS: DatasetConfig[] = [
         minzoom: 5,
         maxzoom: 13,
         backend: "rasterio",
-        date: { mode: "range", default: ["2025-09-01", "2025-09-30"] },
+        attribution: '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
+        date: { mode: "month", default: "2025-09" },
         queryParams: [
           {
             type: "range",
@@ -166,7 +171,8 @@ export const DATASETS: DatasetConfig[] = [
         backend: "rasterio",
         minzoom: 5,
         maxzoom: 13,
-        date: { mode: "range", default: ["2025-09-01", "2025-09-30"] },
+        attribution: '<a href="https://lpdaac.usgs.gov/products/hlss30v002/" target="_blank">HLS Sentinel-2 (NASA LP DAAC / ESA)</a>',
+        date: { mode: "month", default: "2025-09" },
         queryParams: [
           {
             type: "range",
@@ -212,6 +218,7 @@ export const DATASETS: DatasetConfig[] = [
       backend: "xarray",
       minzoom: 6,
       maxzoom: 13,
+      attribution: '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ASF DAAC)</a>',
       date: { mode: "range", default: ["2026-01-01", "2026-02-01"] },
       queryParams: [
         {
@@ -263,6 +270,7 @@ export const DATASETS: DatasetConfig[] = [
       backend: "xarray",
       minzoom: 0,
       maxzoom: 7,
+      attribution: '<a href="https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1" target="_blank">MUR SST (NASA JPL PO.DAAC)</a>',
       date: { mode: "single", default: "2024-01-15" },
       renders: [
         {

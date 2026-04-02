@@ -22,6 +22,14 @@ function toDatetimeRange(startDate: string, endDate: string): string {
   return `${startDate}T00:00:00Z/${endDate}T23:59:59Z`;
 }
 
+/** Converts a "YYYY-MM" month string into a full-month RFC 3339 datetime range. */
+function monthToDatetimeRange(yearMonth: string): string {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${yearMonth}-${String(lastDay).padStart(2, "0")}`;
+  return toDatetimeRange(`${yearMonth}-01`, end);
+}
+
 function makeLabel(text: string, forId: string): HTMLLabelElement {
   const el = document.createElement("label");
   el.textContent = text;
@@ -66,6 +74,16 @@ function renderDateControls(
       const d = input.value || collection.date.default;
       return `${d}T00:00:00Z/${d}T23:59:59Z`;
     };
+  } else if (collection.date.mode === "month") {
+    const defaultMonth = collection.date.default;
+    const input = document.createElement("input");
+    input.type = "month";
+    input.id = "month-input";
+    input.value = defaultMonth;
+    input.addEventListener("change", onChange);
+    container.appendChild(makeLabel("Month", "month-input"));
+    container.appendChild(input);
+    return () => monthToDatetimeRange(input.value || defaultMonth);
   } else {
     const startInput = makeDateInput("start-date-input");
     const endInput = makeDateInput("end-date-input");
