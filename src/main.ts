@@ -26,14 +26,17 @@ const map = new maplibregl.Map({
 
 map.addControl(new maplibregl.NavigationControl(), "bottom-right");
 
+let mapReady = false;
+
 const { getState } = initControls((state) => {
-  if (map.isStyleLoaded()) {
+  if (mapReady) {
     updateLayer(map, state);
     updateLegend(state);
   }
 });
 
 map.on("load", () => {
+  mapReady = true;
   map.setProjection({ type: "globe" });
   map.setSky({
     "sky-color": "#0d1117",
