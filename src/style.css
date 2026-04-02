@@ -1,0 +1,284 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  color: #e8e8e8;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Mobile toggle button (hidden on desktop) */
+#controls-toggle {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e8e8e8;
+  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Controls panel */
+#controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 240px;
+  color-scheme: dark;
+}
+
+#controls label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+#controls label:first-child {
+  margin-top: 0;
+}
+
+.controls-header,
+.controls-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controls-primary {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+/* Advanced collapsible section */
+.controls-advanced {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.controls-advanced summary {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #777;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.controls-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.controls-advanced summary::before {
+  content: "▶";
+  font-size: 8px;
+  transition: transform 0.15s;
+}
+
+.controls-advanced[open] summary::before {
+  transform: rotate(90deg);
+}
+
+#extra-params {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+/* Selects need a solid opaque background so the browser's native dark-mode
+   dropdown popup is consistent. A semi-transparent rgba background confuses
+   some browsers into rendering the popup in light mode. */
+#controls select {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 5px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+#controls input[type="date"],
+#controls input[type="text"] {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 5px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#controls select:focus,
+#controls input[type="date"]:focus,
+#controls input[type="text"]:focus {
+  outline: 1px solid rgba(100, 160, 255, 0.6);
+}
+
+/* Range query param */
+.range-param {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.range-param-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #aaa;
+}
+
+.range-param-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.range-param-row input[type="number"] {
+  width: 0;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #e8e8e8;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.range-param-row input[type="number"]:focus {
+  outline: 1px solid rgba(100, 160, 255, 0.6);
+}
+
+.range-sep {
+  color: #666;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* Zoom guard */
+#zoom-guard {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 200, 60, 0.4);
+  border-radius: 20px;
+  padding: 6px 16px;
+  color: #ffc83c;
+  font-size: 13px;
+  white-space: nowrap;
+  display: none;
+}
+
+#zoom-guard.visible {
+  display: block;
+}
+
+/* Loading indicator */
+#loading {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: #aaa;
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+#loading.visible {
+  display: flex;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #aaa;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile layout */
+@media (max-width: 768px) {
+  #controls-toggle {
+    display: flex;
+  }
+
+  #controls {
+    display: none;
+    top: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    border-radius: 0 0 12px 12px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  #controls.open {
+    display: flex;
+  }
+}
