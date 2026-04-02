@@ -48,6 +48,10 @@ function buildBaseParams(
     }
   }
 
+  for (const [lo, hi] of render.rescale ?? []) {
+    p.append("rescale", `${lo},${hi}`);
+  }
+
   for (const [key, value] of Object.entries(extraParams)) {
     if (Array.isArray(value)) {
       for (const v of value) p.append(key, v);

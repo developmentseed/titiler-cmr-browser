@@ -8,8 +8,14 @@ maplibregl.config.MAX_PARALLEL_IMAGE_REQUESTS_PER_FRAME = 64;
 import "./style.css";
 import { initControls } from "./controls";
 import { updateLayer } from "./layers";
+import { updateLegend } from "./legend";
 import { initLoading } from "./loading";
 import { initZoomGuard } from "./zoom-guard";
+import { initAbout } from "./about";
+import { initCollectionDetails } from "./collection-details";
+
+initAbout();
+initCollectionDetails();
 
 const map = new maplibregl.Map({
   container: "map",
@@ -23,6 +29,7 @@ map.addControl(new maplibregl.NavigationControl(), "bottom-right");
 const { getState } = initControls((state) => {
   if (map.isStyleLoaded()) {
     updateLayer(map, state);
+    updateLegend(state);
   }
 });
 
@@ -40,4 +47,5 @@ map.on("load", () => {
   initLoading(map, () => getState().collection.minzoom);
   initZoomGuard(map, () => getState().collection.minzoom);
   updateLayer(map, getState());
+  updateLegend(getState());
 });

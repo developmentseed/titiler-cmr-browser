@@ -16,10 +16,16 @@ export type RenderConfig = {
   /** Variable names for xarray backend (e.g. ["analysed_sst"]). */
   variables?: string[];
   /** Additional query params merged into TileJSON requests. Values may be
-   *  arrays for repeated params (e.g. `rescale: ["-20,0","-30,5","2,18"]`). */
+   *  arrays for repeated params. Do NOT include `rescale` here — use the
+   *  typed `rescale` field below instead. */
   params: Record<string, string | string[]>;
   /** When present, produces one map layer per entry instead of a single layer. */
   subLayers?: SubLayerSpec[];
+  /** Per-band [min, max] rescale pairs, e.g. [[-4, 4]] or [[-20,0],[-30,5],[2,18]].
+   *  Serialized as repeated `rescale=min,max` query params. */
+  rescale?: [number, number][];
+  /** Physical units shown in the map legend (only for single-band colormapped renders). */
+  units?: string;
 };
 
 /**
@@ -27,11 +33,14 @@ export type RenderConfig = {
  * - `single`: one date input; datetime sent as a single-day range.
  * - `range`: two date inputs (start / end).
  * - `month`: a single month/year picker; datetime sent as the full calendar month range.
+ *
+ * `default` is optional; when omitted the UI computes a smart default from the
+ * current date (yesterday for single, last month for month, last 30 days for range).
  */
 export type DateConfig =
-  | { mode: "single"; default: string }
-  | { mode: "range"; default: [string, string] }
-  | { mode: "month"; default: string };
+  | { mode: "single"; default?: string }
+  | { mode: "range"; default?: [string, string] }
+  | { mode: "month"; default?: string };
 
 /**
  * A numeric range input rendered as two number fields (min, max).
@@ -129,7 +138,7 @@ export const DATASETS: DatasetConfig[] = [
         maxzoom: 13,
         backend: "rasterio",
         attribution: '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
-        date: { mode: "month", default: "2025-09" },
+        date: { mode: "month" },
         queryParams: [
           {
             type: "range",
@@ -138,7 +147,7 @@ export const DATASETS: DatasetConfig[] = [
             min: 0,
             max: 100,
             step: 1,
-            default: [0, 40],
+            default: [0, 100],
           },
         ],
         renders: [
@@ -172,7 +181,7 @@ export const DATASETS: DatasetConfig[] = [
         minzoom: 5,
         maxzoom: 13,
         attribution: '<a href="https://lpdaac.usgs.gov/products/hlss30v002/" target="_blank">HLS Sentinel-2 (NASA LP DAAC / ESA)</a>',
-        date: { mode: "month", default: "2025-09" },
+        date: { mode: "month" },
         queryParams: [
           {
             type: "range",
@@ -181,7 +190,7 @@ export const DATASETS: DatasetConfig[] = [
             min: 0,
             max: 100,
             step: 1,
-            default: [0, 40],
+            default: [0, 100],
           },
         ],
         renders: [
@@ -219,7 +228,7 @@ export const DATASETS: DatasetConfig[] = [
       minzoom: 6,
       maxzoom: 13,
       attribution: '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ASF DAAC)</a>',
-      date: { mode: "range", default: ["2026-01-01", "2026-02-01"] },
+      date: { mode: "range" },
       queryParams: [
         {
           type: "attribute",
@@ -241,11 +250,11 @@ export const DATASETS: DatasetConfig[] = [
           params: {
             expression:
               "10 * log10(b1); 10 * log10(b2); 10 * log10(b1/b2)",
-            rescale: ["-20,0", "-30,5", "2,18"],
             sortkey: "-start_date",
             skipcovered: "true",
             exitwhenfull: "true",
           },
+          rescale: [[-20, 0], [-30, 5], [2, 18]],
           subLayers: [
             {
               params: { group: "/science/LSAR/GCOV/grids/frequencyB" },
@@ -271,23 +280,63 @@ export const DATASETS: DatasetConfig[] = [
       minzoom: 0,
       maxzoom: 7,
       attribution: '<a href="https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1" target="_blank">MUR SST (NASA JPL PO.DAAC)</a>',
-      date: { mode: "single", default: "2024-01-15" },
+      date: { mode: "single" },
       renders: [
         {
           label: "Sea Surface Temperature",
           variables: ["analysed_sst"],
           params: {
+            expression: "analysed_sst-273.15",
             colormap_name: "nipy_spectral",
-            rescale: "271,302",
           },
+          rescale: [[-2, 29]],
+          units: "°C",
         },
         {
           label: "Sea Ice Fraction",
           variables: ["sea_ice_fraction"],
           params: {
+            expression: "100*sea_ice_fraction",
             colormap_name: "blues_r",
-            rescale: "0,1",
           },
+          rescale: [[0, 100]],
+          units: "%",
+        },
+      ],
+    },
+  },
+  {
+    id: "micasa",
+    label: "MiCASA Land Carbon Flux",
+    collection: {
+      label: "MiCASA",
+      collectionConceptId: "C3273638632-GES_DISC",
+      backend: "xarray",
+      minzoom: 0,
+      maxzoom: 7,
+      attribution:
+        '<a href="https://ceos.org/gst/micasa.html" target="_blank">MiCASA (NASA GES DISC)</a>',
+      date: { mode: "single" },
+      renders: [
+        {
+          label: "Net Primary Productivity (NPP)",
+          variables: ["NPP"],
+          params: {
+            expression: "86400000*NPP",
+            colormap_name: "rdylgn",
+          },
+          rescale: [[-4, 4]],
+          units: "g C m⁻² day⁻¹",
+        },
+        {
+          label: "Net Biosphere Exchange (NBE)",
+          variables: ["NEE", "FIRE", "FUEL"],
+          params: {
+            expression: "86400000*(NEE+FIRE+FUEL)",
+            colormap_name: "rdylgn",
+          },
+          rescale: [[-4, 4]],
+          units: "g C m⁻² day⁻¹",
         },
       ],
     },

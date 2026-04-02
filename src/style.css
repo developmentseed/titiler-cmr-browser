@@ -203,20 +203,302 @@ body {
   flex-shrink: 0;
 }
 
-/* Logo */
-#logo {
+/* Brand */
+#brand {
   position: absolute;
-  bottom: 36px;
+  top: 12px;
   left: 12px;
   z-index: 10;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
 }
 
-#logo img {
+.brand-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #e8e8e8;
+}
+
+.brand-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.brand-links a,
+.brand-links button {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #777;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.brand-links a:hover,
+.brand-links button:hover {
+  color: #e8e8e8;
+}
+
+/* Collection info button (in controls header) */
+.collection-info-btn {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 0;
+  text-align: left;
+  transition: color 0.15s;
+  letter-spacing: 0.03em;
+}
+
+.collection-info-btn:hover {
+  color: #aaa;
+}
+
+/* About modal */
+#about-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+#about-backdrop.visible {
   display: block;
-  height: 48px;
-  width: auto;
-  border-radius: 6px;
-  opacity: 0.9;
+}
+
+#about-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+}
+
+#about-modal.visible {
+  display: flex;
+}
+
+.about-panel {
+  position: relative;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 440px;
+  width: calc(100% - 48px);
+  color: #e8e8e8;
+}
+
+#about-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s;
+}
+
+#about-close:hover {
+  color: #e8e8e8;
+}
+
+#about-modal h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #e8e8e8;
+  margin-bottom: 20px;
+}
+
+.about-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.about-body section h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #777;
+  margin-bottom: 6px;
+}
+
+.about-body section p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #bbb;
+}
+
+.about-body a {
+  color: #e8e8e8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+.about-body a:hover {
+  text-decoration-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Collection details modal — reuses .about-panel but needs its own backdrop/modal IDs */
+#collection-details-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+#collection-details-backdrop.visible {
+  display: block;
+}
+
+#collection-details-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+}
+
+#collection-details-modal.visible {
+  display: flex;
+}
+
+#collection-details-modal .about-panel {
+  max-width: 560px;
+  overflow: hidden;
+}
+
+#collection-details-modal h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #e8e8e8;
+  margin-bottom: 16px;
+}
+
+#collection-details-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s;
+}
+
+#collection-details-close:hover {
+  color: #e8e8e8;
+}
+
+.collection-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 60vh;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.collection-details-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.collection-details-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.collection-details-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.collection-details-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.collection-details-abstract {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #bbb;
+  overflow-wrap: break-word;
+}
+
+.collection-details-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 12px;
+}
+
+.collection-details-meta dt {
+  color: #777;
+  white-space: nowrap;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 1px;
+}
+
+.collection-details-meta dd {
+  margin: 0;
+  color: #bbb;
+  word-break: break-word;
+}
+
+.collection-details-meta a {
+  color: #e8e8e8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+.collection-details-meta a:hover {
+  text-decoration-color: rgba(255, 255, 255, 0.8);
+}
+
+.collection-details-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.collection-details-error {
+  font-size: 13px;
+  color: #888;
 }
 
 /* Zoom guard */
@@ -280,6 +562,58 @@ body {
   }
 }
 
+/* Colormap legend */
+#legend {
+  position: absolute;
+  bottom: 36px;
+  left: 12px;
+  z-index: 10;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+#legend.visible {
+  display: flex;
+}
+
+.legend-gradient {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 5px;
+}
+
+#legend canvas {
+  width: 14px;
+  height: 80px;
+  display: block;
+  border-radius: 2px;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.legend-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #aaa;
+}
+
+.legend-units {
+  font-size: 11px;
+  color: #777;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* Mobile layout */
 @media (max-width: 768px) {
   #controls-toggle {
@@ -299,5 +633,9 @@ body {
 
   #controls.open {
     display: flex;
+  }
+
+  #legend {
+    display: none !important;
   }
 }

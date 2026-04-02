@@ -3,10 +3,12 @@ import {
   type AttributeQueryParam,
   type CollectionConfig,
   type DatasetConfig,
+  type DateConfig,
   type QueryParamConfig,
   type RangeQueryParam,
   type RenderConfig,
 } from "./config";
+import { fetchMetadata, showCollectionDetails } from "./collection-details";
 
 export type ControlState = {
   collection: CollectionConfig;
@@ -16,6 +18,29 @@ export type ControlState = {
    *  params (e.g. multiple `attribute` filters). */
   extraParams: Record<string, string | string[]>;
 };
+
+/**
+ * Computes a smart default date value based on mode and the current date.
+ * Used when `date.default` is not set on a collection's DateConfig.
+ */
+function computeDefaultDate(date: DateConfig): string | [string, string] {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+  if (date.mode === "month") {
+    const d = new Date();
+    d.setDate(1); // avoid month-end edge cases when subtracting a month
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  if (date.mode === "range") {
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    return [ymd(start), ymd(yesterday)];
+  }
+  return ymd(yesterday);
+}
 
 /** Formats a start/end date pair into an RFC 3339 datetime range string. */
 function toDatetimeRange(startDate: string, endDate: string): string {
@@ -63,41 +88,72 @@ function renderDateControls(
   collection: CollectionConfig,
   onChange: () => void
 ): () => string {
+  const today = new Date();
+  const todayYMD = today.toISOString().slice(0, 10);
+  const todayYM = todayYMD.slice(0, 7);
+
   container.innerHTML = "";
+
+  let inputs: HTMLInputElement[];
+
   if (collection.date.mode === "single") {
+    const fallback = computeDefaultDate(collection.date) as string;
+    const defaultVal = collection.date.default ?? fallback;
     const input = makeDateInput("date-input");
-    input.value = collection.date.default;
+    input.value = defaultVal;
+    input.max = todayYMD;
     input.addEventListener("change", onChange);
     container.appendChild(makeLabel("Date", "date-input"));
     container.appendChild(input);
+    inputs = [input];
+    fetchMetadata(collection.collectionConceptId).then((umm) => {
+      const begin = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0]?.BeginningDateTime;
+      if (begin) inputs.forEach((el) => (el.min = begin.slice(0, 10)));
+    });
     return () => {
-      const d = input.value || collection.date.default;
+      const d = input.value || defaultVal;
       return `${d}T00:00:00Z/${d}T23:59:59Z`;
     };
   } else if (collection.date.mode === "month") {
-    const defaultMonth = collection.date.default;
+    const fallback = computeDefaultDate(collection.date) as string;
+    const defaultMonth = collection.date.default ?? fallback;
     const input = document.createElement("input");
     input.type = "month";
     input.id = "month-input";
     input.value = defaultMonth;
+    input.max = todayYM;
     input.addEventListener("change", onChange);
     container.appendChild(makeLabel("Month", "month-input"));
     container.appendChild(input);
+    inputs = [input];
+    fetchMetadata(collection.collectionConceptId).then((umm) => {
+      const begin = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0]?.BeginningDateTime;
+      if (begin) inputs.forEach((el) => (el.min = begin.slice(0, 7)));
+    });
     return () => monthToDatetimeRange(input.value || defaultMonth);
   } else {
+    const fallback = computeDefaultDate(collection.date) as [string, string];
+    const [defaultStart, defaultEnd] = collection.date.default ?? fallback;
     const startInput = makeDateInput("start-date-input");
     const endInput = makeDateInput("end-date-input");
-    startInput.value = collection.date.default[0];
-    endInput.value = collection.date.default[1];
+    startInput.value = defaultStart;
+    endInput.value = defaultEnd;
+    startInput.max = todayYMD;
+    endInput.max = todayYMD;
     startInput.addEventListener("change", onChange);
     endInput.addEventListener("change", onChange);
     container.appendChild(makeLabel("Start Date", "start-date-input"));
     container.appendChild(startInput);
     container.appendChild(makeLabel("End Date", "end-date-input"));
     container.appendChild(endInput);
+    inputs = [startInput, endInput];
+    fetchMetadata(collection.collectionConceptId).then((umm) => {
+      const begin = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0]?.BeginningDateTime;
+      if (begin) inputs.forEach((el) => (el.min = begin.slice(0, 10)));
+    });
     return () => {
-      const s = startInput.value || collection.date.default[0];
-      const e = endInput.value || collection.date.default[1];
+      const s = startInput.value || defaultStart;
+      const e = endInput.value || defaultEnd;
       return toDatetimeRange(s, e);
     };
   }
@@ -301,11 +357,17 @@ export function initControls(onChange: (state: ControlState) => void): {
   collectionRow.appendChild(makeLabel("Collection", "collection-select"));
   collectionRow.appendChild(collectionSelect);
 
+  const infoBtn = document.createElement("button");
+  infoBtn.className = "collection-info-btn";
+  infoBtn.title = "View collection details";
+  infoBtn.textContent = "ⓘ details";
+
   header.appendChild(makeLabel("Dataset", "dataset-select"));
   header.appendChild(datasetSelect);
   header.appendChild(collectionRow);
   header.appendChild(makeLabel("Render", "render-select"));
   header.appendChild(renderSelect);
+  header.appendChild(infoBtn);
 
   // --- Primary section (dates — populated dynamically) ---
   const primary = document.createElement("div");
@@ -405,6 +467,7 @@ export function initControls(onChange: (state: ControlState) => void): {
       () => onChange(getState())
     );
     details.open = (collection.queryParams?.length ?? 0) > 0;
+    infoBtn.onclick = () => showCollectionDetails(collection);
     onChange(getState());
   }
 

@@ -12,15 +12,53 @@
     <button id="controls-toggle" aria-label="Toggle controls" aria-expanded="false">☰</button>
     <div id="controls"></div>
 
-    <div id="logo">
-      <img src="/titiler-cmr.png" alt="titiler-cmr" />
+    <div id="brand">
+      <div class="brand-name">titiler-cmr</div>
+      <div class="brand-links">
+        <a href="https://developmentseed.org/titiler-cmr" target="_blank" rel="noopener">docs</a>
+        <a href="https://github.com/developmentseed/titiler-cmr-browser" target="_blank" rel="noopener">source</a>
+        <button id="about-trigger">about</button>
+      </div>
     </div>
 
-    <div id="zoom-guard">Zoom in further to see data</div>
+<div id="zoom-guard">Zoom in further to see data</div>
 
     <div id="loading">
       <div class="spinner"></div>
       Loading tiles&hellip;
+    </div>
+
+    <div id="legend"></div>
+
+    <div id="about-backdrop" aria-hidden="true"></div>
+    <div id="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <div class="about-panel">
+      <button id="about-close" aria-label="Close">&times;</button>
+      <h2 id="about-title">About</h2>
+      <div class="about-body">
+        <section>
+          <h3>This app</h3>
+          <p>An interactive map showcasing <a href="https://developmentseed.org/titiler-cmr" target="_blank" rel="noopener">titiler-cmr</a>'s ability to render NASA Earthdata assets on-the-fly. Browse datasets, adjust date ranges, and explore rendering options — all served as map tiles from a live titiler-cmr instance.</p>
+        </section>
+        <section>
+          <h3>NASA CMR</h3>
+          <p>The <a href="https://cmr.earthdata.nasa.gov" target="_blank" rel="noopener">Common Metadata Repository</a> is NASA's catalog for Earth science data. It indexes thousands of collections — satellite imagery, atmospheric data, ocean observations — and exposes a unified search API used to locate assets for rendering.</p>
+        </section>
+        <section>
+          <h3>titiler-cmr</h3>
+          <p><a href="https://developmentseed.org/titiler-cmr" target="_blank" rel="noopener">titiler-cmr</a> is a dynamic tile server built on <a href="https://developmentseed.org/titiler" target="_blank" rel="noopener">TiTiler</a> that reads Cloud-Optimized GeoTIFFs and NetCDF/HDF5 assets directly from CMR, reprojects them, and serves map tiles without any preprocessing or data duplication.</p>
+        </section>
+      </div>
+      </div>
+    </div>
+
+    <div id="collection-details-backdrop" aria-hidden="true"></div>
+    <div id="collection-details-modal" role="dialog" aria-modal="true" aria-labelledby="collection-details-title">
+      <div class="about-panel">
+        <button id="collection-details-close" aria-label="Close">&times;</button>
+        <h2 id="collection-details-title">Collection Details</h2>
+        <div class="collection-details-body"></div>
+      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
