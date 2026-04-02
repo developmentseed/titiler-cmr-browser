@@ -124,8 +124,12 @@ function renderDateControls(
     container.appendChild(input);
     inputs = [input];
     fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const begin = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0]?.BeginningDateTime;
-      if (begin) inputs.forEach((el) => (el.min = begin.slice(0, 10)));
+      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
+      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
+      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
+        const endYMD = range.EndingDateTime.slice(0, 10);
+        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
+      }
     });
     return () => {
       const d = input.value || defaultVal;
@@ -144,8 +148,12 @@ function renderDateControls(
     container.appendChild(input);
     inputs = [input];
     fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const begin = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0]?.BeginningDateTime;
-      if (begin) inputs.forEach((el) => (el.min = begin.slice(0, 7)));
+      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
+      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 7)));
+      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
+        const endYM = range.EndingDateTime.slice(0, 7);
+        inputs.forEach((el) => { if (endYM < el.max) el.max = endYM; });
+      }
     });
     return () => monthToDatetimeRange(input.value || defaultMonth);
   } else {
@@ -169,8 +177,12 @@ function renderDateControls(
     container.appendChild(endInput);
     inputs = [startInput, endInput];
     fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const begin = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0]?.BeginningDateTime;
-      if (begin) inputs.forEach((el) => (el.min = begin.slice(0, 10)));
+      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
+      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
+      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
+        const endYMD = range.EndingDateTime.slice(0, 10);
+        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
+      }
     });
     return () => {
       const s = startInput.value || defaultStart;

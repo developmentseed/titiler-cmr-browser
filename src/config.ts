@@ -97,6 +97,8 @@ export type QueryParamConfig =
 
 export type CollectionConfig = {
   label: string;
+  /** Short slug included in export filenames (useful when a dataset has multiple collections). */
+  slug?: string;
   collectionConceptId: string;
   assetsRegex?: string;
   minzoom: number;
@@ -132,6 +134,7 @@ export const DATASETS: DatasetConfig[] = [
     collection: [
       {
         label: "HLSS30 (Sentinel-2)",
+        slug: "hlss30",
         collectionConceptId: "C2021957295-LPCLOUD",
         assetsRegex: "B[0-9][0-9A-Za-z]",
         backend: "rasterio",
@@ -175,6 +178,7 @@ export const DATASETS: DatasetConfig[] = [
       },
       {
         label: "HLSL30 (Landsat 8/9)",
+        slug: "hlsl30",
         collectionConceptId: "C2021957657-LPCLOUD",
         assetsRegex: "B[0-9][0-9]",
         minzoom: 5,
@@ -227,8 +231,8 @@ export const DATASETS: DatasetConfig[] = [
       backend: "xarray",
       minzoom: 6,
       maxzoom: 13,
-      attribution: '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ASF DAAC)</a>',
-      date: { mode: "range" },
+      attribution: '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ISRO / ASF DAAC)</a>',
+      date: { mode: "range", default: ["2026-01-01", "2026-04-01"] },
       queryParams: [
         {
           type: "attribute",
@@ -316,7 +320,7 @@ export const DATASETS: DatasetConfig[] = [
       maxzoom: 7,
       attribution:
         '<a href="https://ceos.org/gst/micasa.html" target="_blank">MiCASA (NASA GES DISC)</a>',
-      date: { mode: "single" },
+      date: { mode: "single", default: "2024-12-31" },
       renders: [
         {
           label: "Net Primary Productivity (NPP)",

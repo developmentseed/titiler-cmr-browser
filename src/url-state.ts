@@ -1,8 +1,8 @@
 /**
  * Compact serialized app state stored in the URL hash as URLSearchParams.
- * Example: #d=hls&c=C2021957295-LPCLOUD&r=0&dt=2024-01&lng=-95.1234&lat=38.2345&z=6
+ * Example: #d=hls&c=C2021957295-LPCLOUD&r=0&dt=2024-01&lng=-95.1234&lat=38.2345&z=6&b=45&pt=30
  *
- * Reserved param names: d, c, r, dt, s, e, lng, lat, z.
+ * Reserved param names: d, c, r, dt, s, e, lng, lat, z, b, pt.
  * All other params are treated as extra (titiler-cmr) query params.
  */
 export interface SerializedState {
@@ -15,10 +15,12 @@ export interface SerializedState {
   lng: number;  // map center longitude
   lat: number;  // map center latitude
   z: number;    // map zoom
+  b?: number;   // map bearing (degrees, omitted when 0)
+  pt?: number;  // map pitch (degrees, omitted when 0)
   p?: Record<string, string | string[]>; // extra params
 }
 
-const RESERVED = new Set(["d", "c", "r", "dt", "s", "e", "lng", "lat", "z"]);
+const RESERVED = new Set(["d", "c", "r", "dt", "s", "e", "lng", "lat", "z", "b", "pt"]);
 
 /**
  * Encodes app state into the URL hash as URLSearchParams.
@@ -35,6 +37,8 @@ export function encodeState(state: SerializedState): void {
   params.set("lng", String(state.lng));
   params.set("lat", String(state.lat));
   params.set("z", String(state.z));
+  if (state.b) params.set("b", String(state.b));
+  if (state.pt) params.set("pt", String(state.pt));
   if (state.p) {
     for (const [key, value] of Object.entries(state.p)) {
       if (Array.isArray(value)) {
@@ -62,6 +66,8 @@ export function decodeState(): SerializedState | null {
     const lngStr = params.get("lng");
     const latStr = params.get("lat");
     const zStr = params.get("z");
+    const bStr = params.get("b");
+    const ptStr = params.get("pt");
     if (!d || !c || !r || !lngStr || !latStr || !zStr) return null;
 
     const extraParams: Record<string, string | string[]> = {};
@@ -87,6 +93,8 @@ export function decodeState(): SerializedState | null {
       lng: parseFloat(lngStr),
       lat: parseFloat(latStr),
       z: parseFloat(zStr),
+      b: bStr ? parseFloat(bStr) : undefined,
+      pt: ptStr ? parseFloat(ptStr) : undefined,
       p: Object.keys(extraParams).length > 0 ? extraParams : undefined,
     };
   } catch {

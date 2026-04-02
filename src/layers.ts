@@ -20,6 +20,7 @@ function removeCmrLayers(map: Map): void {
   }
 }
 
+
 /**
  * Builds the shared URLSearchParams for a TileJSON request.
  * Handles string | string[] param values and repeated `attribute` filters.
@@ -113,4 +114,5 @@ export function updateLayer(map: Map, state: ControlState): void {
     p.set("minzoom", String(collection.minzoom));
     addRasterLayer(map, "cmr-0", `${base}?${p}`, collection.minzoom, undefined, collection.attribution);
   }
+
 }

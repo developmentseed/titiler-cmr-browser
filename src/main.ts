@@ -14,23 +14,23 @@ import { initZoomGuard } from "./zoom-guard";
 import { initAbout } from "./about";
 import { initCollectionDetails } from "./collection-details";
 import { decodeState, encodeState, getRawDateFromDom } from "./url-state";
+import { exportMapImage } from "./export";
 
 initAbout();
 initCollectionDetails();
 
-// Add share button to brand links
-const shareBtn = document.createElement("button");
-shareBtn.id = "share-btn";
-shareBtn.textContent = "copy link";
+// Wire share button (pre-existing in HTML)
+const shareBtn = document.getElementById("share-btn") as HTMLButtonElement;
 shareBtn.addEventListener("click", () => {
   navigator.clipboard.writeText(window.location.href).then(() => {
-    shareBtn.textContent = "copied!";
+    shareBtn.title = "Copied!";
+    shareBtn.style.color = "#64a0ff";
     setTimeout(() => {
-      shareBtn.textContent = "copy link";
+      shareBtn.title = "Copy link";
+      shareBtn.style.color = "";
     }, 2000);
   });
 });
-document.querySelector(".brand-links")!.appendChild(shareBtn);
 
 const initialUrlState = decodeState();
 
@@ -39,9 +39,27 @@ const map = new maplibregl.Map({
   style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
   center: [0, 20],
   zoom: 2,
+  canvasContextAttributes: { preserveDrawingBuffer: true },
 });
 
 map.addControl(new maplibregl.NavigationControl(), "bottom-right");
+map.addControl(
+  new maplibregl.GeolocateControl({
+    positionOptions: { enableHighAccuracy: true },
+    fitBoundsOptions: { maxZoom: 10 },
+  }),
+  "bottom-right"
+);
+
+document.getElementById("export-btn")!.addEventListener("click", () => {
+  const { collection, render } = getState();
+  const { datasetId } = getUrlMeta();
+  const rawDate = getRawDateFromDom(collection.date.mode);
+  const dateStr = rawDate.s && rawDate.e
+    ? `${rawDate.s}_${rawDate.e}`
+    : (rawDate.dt ?? undefined);
+  exportMapImage(map, collection.attribution, datasetId, collection.slug, render.label, dateStr);
+});
 
 let mapReady = false;
 
@@ -59,6 +77,8 @@ function updateUrl() {
     lng: parseFloat(center.lng.toFixed(4)),
     lat: parseFloat(center.lat.toFixed(4)),
     z: parseFloat(map.getZoom().toFixed(2)),
+    b: parseFloat(map.getBearing().toFixed(1)) || undefined,
+    pt: parseFloat(map.getPitch().toFixed(1)) || undefined,
     p:
       Object.keys(state.extraParams).length > 0
         ? state.extraParams
@@ -106,6 +126,8 @@ map.on("load", () => {
     map.jumpTo({
       center: [initialUrlState.lng, initialUrlState.lat],
       zoom: initialUrlState.z,
+      bearing: initialUrlState.b ?? 0,
+      pitch: initialUrlState.pt ?? 0,
     });
   }
 
@@ -115,5 +137,13 @@ map.on("load", () => {
 });
 
 map.on("moveend", () => {
+  if (mapReady) updateUrl();
+});
+
+map.on("rotateend", () => {
+  if (mapReady) updateUrl();
+});
+
+map.on("pitchend", () => {
   if (mapReady) updateUrl();
 });
