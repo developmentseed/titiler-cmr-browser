@@ -22,6 +22,20 @@ function removeCmrLayers(map: Map): void {
 
 
 /**
+ * Sets the visibility of all currently-active CMR layers.
+ * Safe to call when layers may not exist yet.
+ */
+export function setCmrLayersVisible(map: Map, visible: boolean): void {
+  const value = visible ? "visible" : "none";
+  for (let i = 0; i < MAX_CMR_LAYERS; i++) {
+    const id = `cmr-${i}`;
+    try {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", value);
+    } catch { /* ignore */ }
+  }
+}
+
+/**
  * Builds the shared URLSearchParams for a TileJSON request.
  * Handles string | string[] param values and repeated `attribute` filters.
  */

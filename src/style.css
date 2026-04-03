@@ -162,6 +162,36 @@ body {
   outline: 1px solid rgba(100, 160, 255, 0.6);
 }
 
+/* Date view mode tabs (Monthly / Daily / Weekly / Custom) */
+.date-mode-tabs {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.date-mode-tabs button {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.date-mode-tabs button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e8e8e8;
+}
+
+.date-mode-tabs button.active {
+  background: rgba(100, 160, 255, 0.22);
+  border-color: rgba(100, 160, 255, 0.5);
+  color: #c8d8f0;
+}
+
 /* Range query param */
 .range-param {
   display: flex;
@@ -201,6 +231,43 @@ body {
   color: #666;
   font-size: 13px;
   flex-shrink: 0;
+}
+
+/* Map display toggle row */
+.controls-map {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+  margin-top: 2px;
+  display: flex;
+  gap: 6px;
+}
+
+.map-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #555;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.map-toggle:hover {
+  color: #888;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.map-toggle.active {
+  color: #c8d8f0;
+  background: rgba(100, 160, 255, 0.12);
+  border-color: rgba(100, 160, 255, 0.35);
 }
 
 /* Brand */
@@ -670,5 +737,10 @@ body {
 
   #legend {
     display: none !important;
+  }
+
+  #brand {
+    top: auto;
+    bottom: 12px;
   }
 }

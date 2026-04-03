@@ -33,14 +33,23 @@ export type RenderConfig = {
  * - `single`: one date input; datetime sent as a single-day range.
  * - `range`: two date inputs (start / end).
  * - `month`: a single month/year picker; datetime sent as the full calendar month range.
+ * - `week`: one date input (week start); datetime sent as a 7-day range.
+ * - `switchable`: renders mode tabs (Monthly/Daily/Weekly/Custom) above the date
+ *   controls. `defaultMode` sets the initially active tab.
  *
  * `default` is optional; when omitted the UI computes a smart default from the
- * current date (yesterday for single, last month for month, last 30 days for range).
+ * current date (yesterday for single/week, last month for month, last 30 days for range).
  */
 export type DateConfig =
   | { mode: "single"; default?: string }
   | { mode: "range"; default?: [string, string] }
-  | { mode: "month"; default?: string };
+  | { mode: "month"; default?: string }
+  | { mode: "week"; default?: string }
+  | {
+      mode: "switchable";
+      defaultMode: "month" | "single" | "week" | "range";
+      default?: string | [string, string];
+    };
 
 /**
  * A numeric range input rendered as two number fields (min, max).
@@ -141,7 +150,7 @@ export const DATASETS: DatasetConfig[] = [
         minzoom: 5,
         maxzoom: 13,
         attribution: '<a href="https://lpdaac.usgs.gov/products/hlss30v002/" target="_blank">HLS Sentinel-2 (NASA LP DAAC / ESA)</a>',
-        date: { mode: "month" },
+        date: { mode: "switchable", defaultMode: "month" },
         queryParams: [
           {
             type: "range",
@@ -152,6 +161,17 @@ export const DATASETS: DatasetConfig[] = [
             step: 1,
             default: [0, 100],
           },
+          {
+            type: "select",
+            label: "Sort by",
+            key: "sort_key",
+            options: [
+              { label: "Least cloudy", value: "cloud_cover" },
+              { label: "Most recent",  value: "-start_date" },
+              { label: "Oldest",       value: "start_date"  },
+            ],
+            default: "cloud_cover",
+          },
         ],
         renders: [
           {
@@ -160,7 +180,6 @@ export const DATASETS: DatasetConfig[] = [
             params: {
               color_formula:
                 "Gamma RGB 3.5 Saturation 1.2 Sigmoidal RGB 15 0.35",
-              sort_key: "cloud_cover",
               exitwhenfull: "true",
             },
           },
@@ -170,7 +189,6 @@ export const DATASETS: DatasetConfig[] = [
             params: {
               color_formula:
                 "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
-              sort_key: "cloud_cover",
               exitwhenfull: "true",
             },
           },
@@ -185,7 +203,7 @@ export const DATASETS: DatasetConfig[] = [
         maxzoom: 13,
         backend: "rasterio",
         attribution: '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
-        date: { mode: "month" },
+        date: { mode: "switchable", defaultMode: "month" },
         queryParams: [
           {
             type: "range",
@@ -196,6 +214,17 @@ export const DATASETS: DatasetConfig[] = [
             step: 1,
             default: [0, 100],
           },
+          {
+            type: "select",
+            label: "Sort by",
+            key: "sort_key",
+            options: [
+              { label: "Least cloudy", value: "cloud_cover" },
+              { label: "Most recent",  value: "-start_date" },
+              { label: "Oldest",       value: "start_date"  },
+            ],
+            default: "cloud_cover",
+          },
         ],
         renders: [
           {
@@ -204,7 +233,6 @@ export const DATASETS: DatasetConfig[] = [
             params: {
               color_formula:
                 "Gamma RGB 3.5 Saturation 1.2 Sigmoidal RGB 15 0.35",
-              sort_key: "cloud_cover",
               exitwhenfull: "true",
             },
           },
@@ -214,7 +242,6 @@ export const DATASETS: DatasetConfig[] = [
             params: {
               color_formula:
                 "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
-              sort_key: "cloud_cover",
               exitwhenfull: "true",
             },
           },
@@ -232,7 +259,7 @@ export const DATASETS: DatasetConfig[] = [
       minzoom: 6,
       maxzoom: 13,
       attribution: '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ISRO / ASF DAAC)</a>',
-      date: { mode: "range", default: ["2026-01-01", "2026-04-01"] },
+      date: { mode: "switchable", defaultMode: "range", default: ["2026-01-01", "2026-04-01"] },
       queryParams: [
         {
           type: "attribute",

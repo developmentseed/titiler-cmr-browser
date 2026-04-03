@@ -5,7 +5,10 @@ import type { Map } from "maplibre-gl";
  * minimum zoom. `getMinZoom` is called on each zoom change so it always
  * reflects the currently selected collection.
  */
-export function initZoomGuard(map: Map, getMinZoom: () => number): void {
+export function initZoomGuard(
+  map: Map,
+  getMinZoom: () => number
+): () => void {
   const el = document.getElementById("zoom-guard")!;
 
   function update(): void {
@@ -15,4 +18,6 @@ export function initZoomGuard(map: Map, getMinZoom: () => number): void {
   map.on("zoom", update);
   map.on("moveend", update);
   map.once("load", update);
+
+  return update;
 }

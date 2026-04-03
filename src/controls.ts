@@ -24,12 +24,14 @@ export interface InitialValues {
   datasetId?: string;
   collectionId?: string;
   renderIdx?: number;
-  /** Raw date input value for single/month date modes. */
+  /** Raw date input value for single/month/week date modes. */
   date?: string;
   /** Raw start date for range date mode. */
   start?: string;
   /** Raw end date for range date mode. */
   end?: string;
+  /** Active date sub-mode for switchable collections (e.g. "month", "single", "week", "range"). */
+  dateMode?: string;
   /** Extra query param values keyed by param key (in their serialized form). */
   extraParams?: Record<string, string | string[]>;
 }
@@ -54,7 +56,15 @@ function computeDefaultDate(date: DateConfig): string | [string, string] {
     start.setDate(start.getDate() - 30);
     return [ymd(start), ymd(yesterday)];
   }
+  // "single", "week", and fallback all use yesterday
   return ymd(yesterday);
+}
+
+/** Returns a 7-day RFC 3339 datetime range starting at `startDate`. */
+function weekDatetimeRange(startDate: string): string {
+  const d = new Date(startDate + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 6);
+  return toDatetimeRange(startDate, d.toISOString().slice(0, 10));
 }
 
 /** Formats a start/end date pair into an RFC 3339 datetime range string. */
@@ -98,12 +108,17 @@ function makeDateInput(id: string): HTMLInputElement {
  * Clears `container` and renders one or two date inputs based on `collection.date.mode`.
  * Returns a getter that produces the correct `datetime` query string.
  * If `initialValue` is provided it overrides the collection's default date.
+ * If `initialMode` is provided it overrides the default sub-mode for switchable collections.
+ * `onModeChange` is called (with the new sub-mode string) whenever the active mode changes;
+ * used by the switchable renderer to keep `activeDateMode` up to date.
  */
 function renderDateControls(
   container: HTMLElement,
   collection: CollectionConfig,
   onChange: () => void,
-  initialValue?: string | [string, string]
+  initialValue?: string | [string, string],
+  initialMode?: string,
+  onModeChange?: (mode: string) => void
 ): () => string {
   const today = new Date();
   const todayYMD = today.toISOString().slice(0, 10);
@@ -114,6 +129,7 @@ function renderDateControls(
   let inputs: HTMLInputElement[];
 
   if (collection.date.mode === "single") {
+    onModeChange?.("single");
     const fallback = computeDefaultDate(collection.date) as string;
     const defaultVal = collection.date.default ?? fallback;
     const input = makeDateInput("date-input");
@@ -135,7 +151,28 @@ function renderDateControls(
       const d = input.value || defaultVal;
       return `${d}T00:00:00Z/${d}T23:59:59Z`;
     };
+  } else if (collection.date.mode === "week") {
+    onModeChange?.("week");
+    const fallback = computeDefaultDate(collection.date) as string;
+    const defaultVal = collection.date.default ?? fallback;
+    const input = makeDateInput("date-input");
+    input.value = (initialValue as string | undefined) ?? defaultVal;
+    input.max = todayYMD;
+    input.addEventListener("change", onChange);
+    container.appendChild(makeLabel("Week of", "date-input"));
+    container.appendChild(input);
+    inputs = [input];
+    fetchMetadata(collection.collectionConceptId).then((umm) => {
+      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
+      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
+      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
+        const endYMD = range.EndingDateTime.slice(0, 10);
+        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
+      }
+    });
+    return () => weekDatetimeRange(input.value || defaultVal);
   } else if (collection.date.mode === "month") {
+    onModeChange?.("month");
     const fallback = computeDefaultDate(collection.date) as string;
     const defaultMonth = collection.date.default ?? fallback;
     const input = document.createElement("input");
@@ -156,7 +193,81 @@ function renderDateControls(
       }
     });
     return () => monthToDatetimeRange(input.value || defaultMonth);
+  } else if (collection.date.mode === "switchable") {
+    // Render mode tabs then delegate to the appropriate sub-renderer.
+    const config = collection.date;
+    const activeMode = { value: (initialMode ?? config.defaultMode) as string };
+
+    const tabs = document.createElement("div");
+    tabs.className = "date-mode-tabs";
+
+    const modeButtons: { id: string; label: string }[] = [
+      { id: "month",  label: "Monthly" },
+      { id: "single", label: "Daily"   },
+      { id: "week",   label: "Weekly"  },
+      { id: "range",  label: "Custom"  },
+    ];
+
+    const body = document.createElement("div");
+    body.className = "date-mode-body";
+
+    // Sub-reader that is replaced whenever the mode tab changes.
+    let subReader: () => string = () => "";
+
+    // Synthetic collection config for the active sub-mode (reuses same
+    // collectionConceptId for metadata fetch de-duplication via browser cache).
+    function subCollectionFor(mode: string): CollectionConfig {
+      const defaultVal = config.default;
+      let subDate: DateConfig;
+      if (mode === "month") {
+        subDate = { mode: "month", default: typeof defaultVal === "string" ? defaultVal : undefined };
+      } else if (mode === "week" || mode === "single") {
+        const d = typeof defaultVal === "string" ? defaultVal : undefined;
+        subDate = { mode: mode as "single" | "week", default: d };
+      } else {
+        const d = Array.isArray(defaultVal) ? defaultVal : undefined;
+        subDate = { mode: "range", default: d };
+      }
+      return { ...collection, date: subDate };
+    }
+
+    function renderSubControls(mode: string, value?: string | [string, string]) {
+      activeMode.value = mode;
+      onModeChange?.(mode);
+      // Update tab button states
+      for (const btn of Array.from(tabs.querySelectorAll<HTMLButtonElement>("button"))) {
+        btn.classList.toggle("active", btn.dataset.mode === mode);
+      }
+      subReader = renderDateControls(body, subCollectionFor(mode), onChange, value);
+      onChange();
+    }
+
+    for (const { id, label } of modeButtons) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = label;
+      btn.dataset.mode = id;
+      btn.classList.toggle("active", id === activeMode.value);
+      btn.addEventListener("click", () => {
+        if (activeMode.value !== id) renderSubControls(id);
+      });
+      tabs.appendChild(btn);
+    }
+
+    container.appendChild(tabs);
+    container.appendChild(body);
+
+    // Determine initial value for the active sub-mode
+    const initVal: string | [string, string] | undefined =
+      initialMode === "range" && initialValue !== undefined ? initialValue as [string, string]
+      : initialMode !== undefined && initialMode !== "range" ? initialValue as string | undefined
+      : undefined;
+
+    renderSubControls(activeMode.value, initVal ?? (config.default as string | [string, string] | undefined));
+
+    return () => subReader();
   } else {
+    onModeChange?.("range");
     const fallback = computeDefaultDate(collection.date) as [string, string];
     const [defaultStart, defaultEnd] = collection.date.default ?? fallback;
     const [initialStart, initialEnd] = (initialValue as [string, string] | undefined) ?? [
@@ -411,7 +522,7 @@ export function initControls(
   initial?: InitialValues
 ): {
   getState: () => ControlState;
-  getUrlMeta: () => { datasetId: string; renderIdx: number };
+  getUrlMeta: () => { datasetId: string; renderIdx: number; activeDateMode: string };
 } {
   const container = document.getElementById("controls")!;
   const toggleBtn = document.getElementById("controls-toggle")!;
@@ -469,6 +580,8 @@ export function initControls(
 
   let readDatetime: () => string = () => "";
   let readExtraParams: () => Record<string, string | string[]> = () => ({});
+  /** The effective date mode string (sub-mode for switchable collections). */
+  let activeDateMode = "";
 
   // Tracks whether the initial URL values have been applied during bootstrap.
   let initialApplied = false;
@@ -555,6 +668,7 @@ export function initControls(
     populateRenders(collection);
 
     let dateInitial: string | [string, string] | undefined;
+    let dateModeInitial: string | undefined;
     let extraParamsInitial: Record<string, string | string[]> | undefined;
 
     if (!initialApplied && initial) {
@@ -569,6 +683,7 @@ export function initControls(
       } else if (initial.start && initial.end) {
         dateInitial = [initial.start, initial.end];
       }
+      dateModeInitial = initial.dateMode;
       extraParamsInitial = initial.extraParams;
       initialApplied = true;
     }
@@ -577,7 +692,9 @@ export function initControls(
       primary,
       collection,
       () => onChange(getState()),
-      dateInitial
+      dateInitial,
+      dateModeInitial,
+      (mode) => { activeDateMode = mode; }
     );
     readExtraParams = renderExtraParams(
       extraParamsContainer,
@@ -602,6 +719,7 @@ export function initControls(
     getUrlMeta: () => ({
       datasetId: datasetSelect.value,
       renderIdx: parseInt(renderSelect.value ?? "0", 10),
+      activeDateMode,
     }),
   };
 }
