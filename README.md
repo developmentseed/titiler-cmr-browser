@@ -17,7 +17,7 @@ A minimal map application showcasing [titiler-cmr](https://developmentseed.org/t
 | Dataset | Collections | Backend |
 |---|---|---|
 | HLS (Harmonized Landsat Sentinel-2) | HLSL30 (Landsat 8/9), HLSS30 (Sentinel-2) | rasterio |
-| NISAR Beta GCOV | NISAR L2 GCOV | xarray |
+| NISAR Beta GCOV | NISAR L2 GCOV with balanced, vegetation, urban, water-emphasis, and custom RGB SAR renders | xarray |
 | MUR Sea Surface Temperature | MUR SST | xarray |
 
 ## Development
@@ -61,6 +61,8 @@ Each `CollectionConfig` requires:
 | `date` | `{ mode: "single", default: "YYYY-MM-DD" }` or `{ mode: "range", default: ["YYYY-MM-DD", "YYYY-MM-DD"] }` |
 | `renders` | Array of `RenderConfig` objects (label, assets/variables, query params) |
 | `queryParams` | Optional extra controls: `range`, `select`, `text`, or `attribute` |
+
+The NISAR collection uses render presets for a few common dual-pol interpretation modes plus a `Custom RGB Composite` render that exposes RGB channel selectors mapping `HHHH`, `HVHV`, and `HHHH:HVHV` into the red, green, and blue channels. Each selector choice carries its own suggested rescale range so channel stretches follow the chosen variables.
 
 A dataset with a single collection hides the collection selector in the UI. A dataset with multiple collections shows it.
 

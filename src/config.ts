@@ -9,6 +9,14 @@ export type SubLayerSpec = {
   maxzoom?: number;
 };
 
+export type RgbExpressionOption = {
+  label: string;
+  value: string;
+  expression: string;
+  /** Suggested [min, max] rescale for this channel when used in an RGB composite. */
+  rescale?: [number, number];
+};
+
 export type RenderConfig = {
   label: string;
   /** Asset names for rasterio backend (e.g. ["B04","B03","B02"]). */
@@ -19,6 +27,11 @@ export type RenderConfig = {
    *  arrays for repeated params. Do NOT include `rescale` here — use the
    *  typed `rescale` field below instead. */
   params: Record<string, string | string[]>;
+  /** Optional per-channel expression selectors used to build an RGB expression. */
+  rgbExpression?: {
+    options: RgbExpressionOption[];
+    defaults: [string, string, string];
+  };
   /** When present, produces one map layer per entry instead of a single layer. */
   subLayers?: SubLayerSpec[];
   /** Per-band [min, max] rescale pairs, e.g. [[-4, 4]] or [[-20,0],[-30,5],[2,18]].
@@ -135,6 +148,47 @@ export type DatasetConfig = {
 // ---------------------------------------------------------------------------
 // Datasets
 // ---------------------------------------------------------------------------
+
+const NISAR_GCOV_VARIABLES = ["HHHH", "HVHV"];
+
+const NISAR_GCOV_SUBLAYERS: SubLayerSpec[] = [
+  {
+    params: { group: "/science/LSAR/GCOV/grids/frequencyB" },
+    minzoom: 6,
+    maxzoom: 10,
+  },
+  {
+    params: { group: "/science/LSAR/GCOV/grids/frequencyA" },
+    minzoom: 10,
+  },
+];
+
+const NISAR_GCOV_COMMON_PARAMS = {
+  sortkey: "-start_date",
+  skipcovered: "true",
+  exitwhenfull: "true",
+};
+
+const NISAR_GCOV_RGB_OPTIONS: RgbExpressionOption[] = [
+  {
+    label: "HHHH",
+    value: "hh",
+    expression: "10 * log10(b1)",
+    rescale: [-20, 0],
+  },
+  {
+    label: "HVHV",
+    value: "hv",
+    expression: "10 * log10(b2)",
+    rescale: [-30, 5],
+  },
+  {
+    label: "HHHH : HVHV",
+    value: "ratio",
+    expression: "10 * log10(b1/b2)",
+    rescale: [2, 18],
+  },
+];
 
 export const DATASETS: DatasetConfig[] = [
   {
@@ -276,27 +330,54 @@ export const DATASETS: DatasetConfig[] = [
       ],
       renders: [
         {
-          label: "HHHH / HVHV RGB",
-          variables: ["HHHH", "HVHV"],
+          label: "Balanced Dual-Pol RGB",
+          variables: NISAR_GCOV_VARIABLES,
           params: {
-            expression:
-              "10 * log10(b1); 10 * log10(b2); 10 * log10(b1/b2)",
-            sortkey: "-start_date",
-            skipcovered: "true",
-            exitwhenfull: "true",
+            ...NISAR_GCOV_COMMON_PARAMS,
+            expression: "10 * log10(b1); 10 * log10(b2); 10 * log10(b1/b2)",
           },
           rescale: [[-20, 0], [-30, 5], [2, 18]],
-          subLayers: [
-            {
-              params: { group: "/science/LSAR/GCOV/grids/frequencyB" },
-              minzoom: 6,
-              maxzoom: 10,
-            },
-            {
-              params: { group: "/science/LSAR/GCOV/grids/frequencyA" },
-              minzoom: 10,
-            },
-          ],
+          subLayers: NISAR_GCOV_SUBLAYERS,
+        },
+        {
+          label: "Vegetation / Volume Emphasis",
+          variables: NISAR_GCOV_VARIABLES,
+          params: {
+            ...NISAR_GCOV_COMMON_PARAMS,
+            expression: "10 * log10(b2); 10 * log10(b1); 10 * log10(b1/b2)",
+          },
+          rescale: [[-30, 5], [-20, 0], [2, 18]],
+          subLayers: NISAR_GCOV_SUBLAYERS,
+        },
+        {
+          label: "Urban / Built Structure Emphasis",
+          variables: NISAR_GCOV_VARIABLES,
+          params: {
+            ...NISAR_GCOV_COMMON_PARAMS,
+            expression: "10 * log10(b1/b2); 10 * log10(b1); 10 * log10(b2)",
+          },
+          rescale: [[2, 18], [-20, 0], [-30, 5]],
+          subLayers: NISAR_GCOV_SUBLAYERS,
+        },
+        {
+          label: "Water / Smooth Surface Emphasis",
+          variables: NISAR_GCOV_VARIABLES,
+          params: {
+            ...NISAR_GCOV_COMMON_PARAMS,
+            expression: "10 * log10(b2); 10 * log10(b1/b2); 10 * log10(b1)",
+          },
+          rescale: [[-30, 5], [2, 18], [-20, 0]],
+          subLayers: NISAR_GCOV_SUBLAYERS,
+        },
+        {
+          label: "Custom RGB Composite",
+          variables: NISAR_GCOV_VARIABLES,
+          params: NISAR_GCOV_COMMON_PARAMS,
+          rgbExpression: {
+            options: NISAR_GCOV_RGB_OPTIONS,
+            defaults: ["hh", "hv", "ratio"],
+          },
+          subLayers: NISAR_GCOV_SUBLAYERS,
         },
       ],
     },

@@ -73,16 +73,25 @@ body {
 }
 
 .controls-header,
+.controls-render-options,
 .controls-primary {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
+.controls-render-options,
 .controls-primary {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 8px;
   margin-top: 2px;
+}
+
+.rgb-controls-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #777;
 }
 
 /* Advanced collapsible section */

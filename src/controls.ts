@@ -507,6 +507,57 @@ function renderExtraParams(
   };
 }
 
+function renderRgbExpressionControls(
+  container: HTMLElement,
+  render: RenderConfig,
+  onChange: () => void,
+  initialValues?: Record<string, string | string[]>
+): () => Record<string, string> {
+  container.innerHTML = "";
+  container.hidden = !render.rgbExpression;
+  if (!render.rgbExpression) return () => ({});
+
+  const title = document.createElement("div");
+  title.className = "rgb-controls-title";
+  title.textContent = "RGB Channels";
+  container.appendChild(title);
+
+  const getters: Array<() => [string, string]> = [];
+  const channelDefs: Array<{ key: "rgb_r" | "rgb_g" | "rgb_b"; label: string }> = [
+    { key: "rgb_r", label: "Red" },
+    { key: "rgb_g", label: "Green" },
+    { key: "rgb_b", label: "Blue" },
+  ];
+
+  channelDefs.forEach(({ key, label }, idx) => {
+    const id = `rgb-${key}`;
+    const select = makeSelect(id);
+
+    for (const opt of render.rgbExpression!.options) {
+      const el = document.createElement("option");
+      el.value = opt.value;
+      el.textContent = opt.label;
+      select.appendChild(el);
+    }
+
+    const stored = initialValues?.[key];
+    const initial = Array.isArray(stored) ? stored[0] : stored;
+    const fallback = render.rgbExpression!.defaults[idx];
+    const nextValue =
+      initial !== undefined && Array.from(select.options).some((o) => o.value === initial)
+        ? initial
+        : fallback;
+    select.value = nextValue;
+    select.addEventListener("change", onChange);
+
+    container.appendChild(makeLabel(`${label} Channel`, id));
+    container.appendChild(select);
+    getters.push(() => [key, select.value]);
+  });
+
+  return () => Object.fromEntries(getters.map((g) => g()));
+}
+
 // ---------------------------------------------------------------------------
 // Main controls init
 // ---------------------------------------------------------------------------
@@ -558,6 +609,9 @@ export function initControls(
   header.appendChild(renderSelect);
   header.appendChild(infoBtn);
 
+  const renderOptions = document.createElement("div");
+  renderOptions.className = "controls-render-options";
+
   // --- Primary section (dates — populated dynamically) ---
   const primary = document.createElement("div");
   primary.className = "controls-primary";
@@ -575,10 +629,12 @@ export function initControls(
   details.appendChild(extraParamsContainer);
 
   container.appendChild(header);
+  container.appendChild(renderOptions);
   container.appendChild(primary);
   container.appendChild(details);
 
   let readDatetime: () => string = () => "";
+  let readRenderParams: () => Record<string, string> = () => ({});
   let readExtraParams: () => Record<string, string | string[]> = () => ({});
   /** The effective date mode string (sub-mode for switchable collections). */
   let activeDateMode = "";
@@ -648,12 +704,21 @@ export function initControls(
     }
   }
 
+  function getSelectedRender(collection: CollectionConfig): RenderConfig {
+    const renderIdx = parseInt(renderSelect.value ?? "0", 10);
+    return collection.renders[renderIdx] ?? collection.renders[0];
+  }
+
   function getState(): ControlState {
     const dataset = getSelectedDataset();
     const collection = getSelectedCollection(dataset);
-    const renderIdx = parseInt(renderSelect.value ?? "0", 10);
-    const render = collection.renders[renderIdx] ?? collection.renders[0];
-    return { collection, render, datetime: readDatetime(), extraParams: readExtraParams() };
+    const render = getSelectedRender(collection);
+    return {
+      collection,
+      render,
+      datetime: readDatetime(),
+      extraParams: { ...readExtraParams(), ...readRenderParams() },
+    };
   }
 
   function onDatasetChange(): void {
@@ -661,6 +726,18 @@ export function initControls(
     populateCollections(dataset);
     collectionRow.hidden = getCollections(dataset).length <= 1;
     onCollectionChange();
+  }
+
+  function onRenderChange(initialRenderParams?: Record<string, string | string[]>): void {
+    const collection = getSelectedCollection(getSelectedDataset());
+    const render = getSelectedRender(collection);
+    readRenderParams = renderRgbExpressionControls(
+      renderOptions,
+      render,
+      () => onChange(getState()),
+      initialRenderParams
+    );
+    onChange(getState());
   }
 
   function onCollectionChange(): void {
@@ -704,12 +781,12 @@ export function initControls(
     );
     details.open = (collection.queryParams?.length ?? 0) > 0;
     infoBtn.onclick = () => showCollectionDetails(collection);
-    onChange(getState());
+    onRenderChange(extraParamsInitial);
   }
 
   datasetSelect.addEventListener("change", onDatasetChange);
   collectionSelect.addEventListener("change", onCollectionChange);
-  renderSelect.addEventListener("change", () => onChange(getState()));
+  renderSelect.addEventListener("change", () => onRenderChange());
 
   populateDatasets();
   onDatasetChange();
