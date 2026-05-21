@@ -6,15 +6,30 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
-    "maplibre-gl": "^5.3.0"
+    "@deck.gl/core": "^9.3.2",
+    "@deck.gl/geo-layers": "^9.3.2",
+    "@deck.gl/layers": "^9.3.2",
+    "@deck.gl/mapbox": "^9.3.2",
+    "@deck.gl/mesh-layers": "^9.3.2",
+    "@developmentseed/deck.gl-raster": "^0.7.0",
+    "@developmentseed/morecantile": "^0.7.0",
+    "@luma.gl/core": "^9.3.3",
+    "@luma.gl/shadertools": "^9.3.3",
+    "maplibre-gl": "^5.3.0",
+    "npyjs": "^1.1.0"
   },
   "devDependencies": {
+    "@types/node": "^25.9.1",
     "gh-pages": "^6.3.0",
+    "jsdom": "^29.1.1",
     "typescript": "^5.7.2",
-    "vite": "^6.3.1"
+    "vite": "^6.3.1",
+    "vitest": "^4.1.7"
   }
 }

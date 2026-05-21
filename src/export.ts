@@ -1,10 +1,30 @@
 import type { Map } from "maplibre-gl";
 
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "");
+}
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]*>/g, "").trim();
+}
+
+function buildExportFilename(
+  datasetSlug?: string,
+  collectionSlug?: string,
+  label?: string,
+  dateStr?: string,
+): string {
+  const datasetPart = datasetSlug ? `-${slugify(datasetSlug)}` : "";
+  const collectionPart = collectionSlug ? `-${slugify(collectionSlug)}` : "";
+  const labelPart = label ? `-${slugify(label)}` : "";
+  const datePart = dateStr ? `-${dateStr}` : "";
+  return `titiler-cmr${datasetPart}${collectionPart}${labelPart}${datePart}.png`;
+}
+
 /**
  * Captures the current map canvas and triggers a PNG download.
  * If `attribution` is provided (an HTML string), it is stripped to plain text
  * and rendered as an overlay in the bottom-right corner of the image.
- * If `label` is provided it is slugified and included in the filename.
  * Requires the map to be initialized with `preserveDrawingBuffer: true`.
  */
 export function exportMapImage(
@@ -21,12 +41,15 @@ export function exportMapImage(
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Could not create 2D export canvas context.");
+  }
 
   ctx.drawImage(mapCanvas, 0, 0);
 
   if (attribution) {
-    const text = attribution.replace(/<[^>]*>/g, "");
+    const text = stripHtml(attribution);
     const fontSize = 11;
     const padding = 5;
     ctx.font = `${fontSize}px system-ui, sans-serif`;
@@ -42,14 +65,14 @@ export function exportMapImage(
     ctx.fillText(text, x + padding, y + padding + fontSize - 1);
   }
 
-  const datasetPart = datasetSlug ? `-${datasetSlug}` : "";
-  const collectionPart = collectionSlug ? `-${collectionSlug}` : "";
-  const labelPart = label
-    ? "-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "")
-    : "";
-  const datePart = dateStr ? `-${dateStr}` : "";
   const link = document.createElement("a");
-  link.download = `titiler-cmr${datasetPart}${collectionPart}${labelPart}${datePart}.png`;
+  link.download = buildExportFilename(datasetSlug, collectionSlug, label, dateStr);
   link.href = canvas.toDataURL("image/png");
   link.click();
 }
+
+export const __test__ = {
+  buildExportFilename,
+  stripHtml,
+  slugify,
+};

@@ -9,36 +9,88 @@ export type SubLayerSpec = {
   maxzoom?: number;
 };
 
+export type StyleExpression =
+  | { op: "band"; band: number }
+  | { op: "const"; value: number }
+  | { op: "log10"; arg: StyleExpression }
+  | {
+      op: "add" | "sub" | "mul" | "div";
+      args: [StyleExpression, StyleExpression];
+    };
+
+export type StyleExpressionRef =
+  | StyleExpression
+  | {
+      expression: StyleExpression;
+      rescale?: [number, number];
+    }
+  | {
+      selectorKey: string;
+    };
+
 export type RgbExpressionOption = {
   label: string;
   value: string;
-  expression: string;
+  /** Client-side typed expression used by selector-driven RGB styles. */
+  compiled: StyleExpression;
   /** Suggested [min, max] rescale for this channel when used in an RGB composite. */
   rescale?: [number, number];
 };
 
+export type StyleSelectorConfig = {
+  key: string;
+  label: string;
+  options: RgbExpressionOption[];
+  default: string;
+};
+
+export type ToneAdjustment =
+  | { kind: "gamma"; value: number }
+  | { kind: "saturation"; value: number }
+  | { kind: "sigmoidal"; contrast: number; bias: number };
+
+export type FetchConfig = {
+  /** Asset names for rasterio backends (for example ["B04", "B03", "B02"]). */
+  assets?: string[];
+  /** Variable names for xarray backends (for example ["analysed_sst"]). */
+  variables?: string[];
+  /** Source-affecting request params merged into raw-tile requests. */
+  params?: Record<string, string | string[]>;
+};
+
+export type RgbStyleConfig = {
+  kind: "rgb";
+  channels: [StyleExpressionRef, StyleExpressionRef, StyleExpressionRef];
+  /** Optional source band to use as an alpha/mask channel. */
+  alphaBand?: number;
+  selectors?: StyleSelectorConfig[];
+  adjustments?: ToneAdjustment[];
+};
+
+export type ScalarStyleConfig = {
+  kind: "scalar";
+  expression: StyleExpression;
+  rescale: [number, number];
+  colormapName: string;
+  colormapParamKey?: string;
+  colormapOptions?: { label: string; value: string }[];
+  /** Optional post-expression nodata value to discard / render transparent. */
+  nodata?: number;
+  /** Optional source band to use as an alpha / mask channel. */
+  alphaBand?: number;
+  units?: string;
+};
+
+export type StyleConfig = RgbStyleConfig | ScalarStyleConfig;
+
 export type RenderConfig = {
   label: string;
-  /** Asset names for rasterio backend (e.g. ["B04","B03","B02"]). */
-  assets?: string[];
-  /** Variable names for xarray backend (e.g. ["analysed_sst"]). */
-  variables?: string[];
-  /** Additional query params merged into TileJSON requests. Values may be
-   *  arrays for repeated params. Do NOT include `rescale` here — use the
-   *  typed `rescale` field below instead. */
-  params: Record<string, string | string[]>;
-  /** Optional per-channel expression selectors used to build an RGB expression. */
-  rgbExpression?: {
-    options: RgbExpressionOption[];
-    defaults: [string, string, string];
-  };
+  fetch: FetchConfig;
+  style: StyleConfig;
+  /** Optional server-side styling params for TileJSON/image tile rendering. */
+  serverParams?: Record<string, string | string[]>;
   /** When present, produces one map layer per entry instead of a single layer. */
   subLayers?: SubLayerSpec[];
-  /** Per-band [min, max] rescale pairs, e.g. [[-4, 4]] or [[-20,0],[-30,5],[2,18]].
-   *  Serialized as repeated `rescale=min,max` query params. */
-  rescale?: [number, number][];
-  /** Physical units shown in the map legend (only for single-band colormapped renders). */
-  units?: string;
 };
 
 /**
@@ -145,6 +197,26 @@ export type DatasetConfig = {
   collection: CollectionConfig | CollectionConfig[];
 };
 
+const band = (index: number): StyleExpression => ({ op: "band", band: index });
+const constant = (value: number): StyleExpression => ({ op: "const", value });
+const log10 = (arg: StyleExpression): StyleExpression => ({ op: "log10", arg });
+const add = (
+  left: StyleExpression,
+  right: StyleExpression,
+): StyleExpression => ({ op: "add", args: [left, right] });
+const sub = (
+  left: StyleExpression,
+  right: StyleExpression,
+): StyleExpression => ({ op: "sub", args: [left, right] });
+const mul = (
+  left: StyleExpression,
+  right: StyleExpression,
+): StyleExpression => ({ op: "mul", args: [left, right] });
+const div = (
+  left: StyleExpression,
+  right: StyleExpression,
+): StyleExpression => ({ op: "div", args: [left, right] });
+
 // ---------------------------------------------------------------------------
 // Datasets
 // ---------------------------------------------------------------------------
@@ -169,25 +241,55 @@ const NISAR_GCOV_COMMON_PARAMS = {
   exitwhenfull: "true",
 };
 
+const withRescale = (
+  expression: StyleExpression,
+  rescale?: [number, number],
+): StyleExpressionRef => ({ expression, rescale });
+
 const NISAR_GCOV_RGB_OPTIONS: RgbExpressionOption[] = [
   {
     label: "HHHH",
     value: "hh",
-    expression: "10 * log10(b1)",
+    compiled: mul(constant(10), log10(band(1))),
     rescale: [-20, 0],
   },
   {
     label: "HVHV",
     value: "hv",
-    expression: "10 * log10(b2)",
+    compiled: mul(constant(10), log10(band(2))),
     rescale: [-30, 5],
   },
   {
     label: "HHHH : HVHV",
     value: "ratio",
-    expression: "10 * log10(b1/b2)",
+    compiled: mul(constant(10), log10(div(band(1), band(2)))),
     rescale: [2, 18],
   },
+];
+
+const HLS_NORMALIZED_RANGE: [number, number] = [0, 32767];
+
+const SCALAR_COLORMAP_OPTIONS = [
+  { label: "Turbo", value: "turbo" },
+  { label: "Viridis", value: "viridis" },
+  { label: "Thermal", value: "thermal" },
+  { label: "Cividis", value: "cividis" },
+  { label: "Spectral", value: "spectral" },
+  { label: "Blue", value: "blues_r" },
+  { label: "Red–Yellow–Green", value: "rdylgn" },
+  { label: "Nipy Spectral", value: "nipy_spectral" },
+] as const;
+
+const HLS_TRUE_COLOR_ADJUSTMENTS: ToneAdjustment[] = [
+  { kind: "gamma", value: 3.5 },
+  { kind: "saturation", value: 1.2 },
+  { kind: "sigmoidal", contrast: 15, bias: 0.35 },
+];
+
+const HLS_FALSE_COLOR_ADJUSTMENTS: ToneAdjustment[] = [
+  { kind: "gamma", value: 2.5 },
+  { kind: "saturation", value: 1.2 },
+  { kind: "sigmoidal", contrast: 10, bias: 0.35 },
 ];
 
 export const DATASETS: DatasetConfig[] = [
@@ -231,20 +333,36 @@ export const DATASETS: DatasetConfig[] = [
         renders: [
           {
             label: "True Color",
-            assets: ["B04", "B03", "B02"],
-            params: {
-              color_formula:
-                "Gamma RGB 3.5 Saturation 1.2 Sigmoidal RGB 15 0.35",
-              exitwhenfull: "true",
+            fetch: {
+              assets: ["B04", "B03", "B02"],
+              params: { exitwhenfull: "true" },
+            },
+            style: {
+              kind: "rgb",
+              channels: [
+                withRescale(band(1), HLS_NORMALIZED_RANGE),
+                withRescale(band(2), HLS_NORMALIZED_RANGE),
+                withRescale(band(3), HLS_NORMALIZED_RANGE),
+              ],
+              alphaBand: 4,
+              adjustments: HLS_TRUE_COLOR_ADJUSTMENTS,
             },
           },
           {
             label: "False Color (NIR)",
-            assets: ["B8A", "B03", "B02"],
-            params: {
-              color_formula:
-                "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
-              exitwhenfull: "true",
+            fetch: {
+              assets: ["B8A", "B03", "B02"],
+              params: { exitwhenfull: "true" },
+            },
+            style: {
+              kind: "rgb",
+              channels: [
+                withRescale(band(1), HLS_NORMALIZED_RANGE),
+                withRescale(band(2), HLS_NORMALIZED_RANGE),
+                withRescale(band(3), HLS_NORMALIZED_RANGE),
+              ],
+              alphaBand: 4,
+              adjustments: HLS_FALSE_COLOR_ADJUSTMENTS,
             },
           },
         ],
@@ -285,20 +403,36 @@ export const DATASETS: DatasetConfig[] = [
         renders: [
           {
             label: "True Color",
-            assets: ["B04", "B03", "B02"],
-            params: {
-              color_formula:
-                "Gamma RGB 3.5 Saturation 1.2 Sigmoidal RGB 15 0.35",
-              exitwhenfull: "true",
+            fetch: {
+              assets: ["B04", "B03", "B02"],
+              params: { exitwhenfull: "true" },
+            },
+            style: {
+              kind: "rgb",
+              channels: [
+                withRescale(band(1), HLS_NORMALIZED_RANGE),
+                withRescale(band(2), HLS_NORMALIZED_RANGE),
+                withRescale(band(3), HLS_NORMALIZED_RANGE),
+              ],
+              alphaBand: 4,
+              adjustments: HLS_TRUE_COLOR_ADJUSTMENTS,
             },
           },
           {
             label: "False Color (NIR)",
-            assets: ["B05", "B03", "B02"],
-            params: {
-              color_formula:
-                "Gamma RGB 2.5 Saturation 1.2 Sigmoidal RGB 10 0.35",
-              exitwhenfull: "true",
+            fetch: {
+              assets: ["B05", "B03", "B02"],
+              params: { exitwhenfull: "true" },
+            },
+            style: {
+              kind: "rgb",
+              channels: [
+                withRescale(band(1), HLS_NORMALIZED_RANGE),
+                withRescale(band(2), HLS_NORMALIZED_RANGE),
+                withRescale(band(3), HLS_NORMALIZED_RANGE),
+              ],
+              alphaBand: 4,
+              adjustments: HLS_FALSE_COLOR_ADJUSTMENTS,
             },
           },
         ],
@@ -338,67 +472,113 @@ export const DATASETS: DatasetConfig[] = [
       renders: [
         {
           label: "Balanced Dual-Pol RGB",
-          variables: NISAR_GCOV_VARIABLES,
-          params: {
-            ...NISAR_GCOV_COMMON_PARAMS,
-            expression: "10 * log10(b1); 10 * log10(b2); 10 * log10(b1/b2)",
+          fetch: {
+            variables: NISAR_GCOV_VARIABLES,
+            params: NISAR_GCOV_COMMON_PARAMS,
           },
-          rescale: [
-            [-20, 0],
-            [-30, 5],
-            [2, 18],
-          ],
+          style: {
+            kind: "rgb",
+            channels: [
+              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+              withRescale(
+                mul(constant(10), log10(div(band(1), band(2)))),
+                [2, 18],
+              ),
+            ],
+          },
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
           label: "Vegetation / Volume Emphasis",
-          variables: NISAR_GCOV_VARIABLES,
-          params: {
-            ...NISAR_GCOV_COMMON_PARAMS,
-            expression: "10 * log10(b2); 10 * log10(b1); 10 * log10(b1/b2)",
+          fetch: {
+            variables: NISAR_GCOV_VARIABLES,
+            params: NISAR_GCOV_COMMON_PARAMS,
           },
-          rescale: [
-            [-30, 5],
-            [-20, 0],
-            [2, 18],
-          ],
+          style: {
+            kind: "rgb",
+            channels: [
+              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+              withRescale(
+                mul(constant(10), log10(div(band(1), band(2)))),
+                [2, 18],
+              ),
+            ],
+          },
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
           label: "Urban / Built Structure Emphasis",
-          variables: NISAR_GCOV_VARIABLES,
-          params: {
-            ...NISAR_GCOV_COMMON_PARAMS,
-            expression: "10 * log10(b1/b2); 10 * log10(b1); 10 * log10(b2)",
+          fetch: {
+            variables: NISAR_GCOV_VARIABLES,
+            params: NISAR_GCOV_COMMON_PARAMS,
           },
-          rescale: [
-            [2, 18],
-            [-20, 0],
-            [-30, 5],
-          ],
+          style: {
+            kind: "rgb",
+            channels: [
+              withRescale(
+                mul(constant(10), log10(div(band(1), band(2)))),
+                [2, 18],
+              ),
+              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+            ],
+          },
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
           label: "Water / Smooth Surface Emphasis",
-          variables: NISAR_GCOV_VARIABLES,
-          params: {
-            ...NISAR_GCOV_COMMON_PARAMS,
-            expression: "10 * log10(b2); 10 * log10(b1/b2); 10 * log10(b1)",
+          fetch: {
+            variables: NISAR_GCOV_VARIABLES,
+            params: NISAR_GCOV_COMMON_PARAMS,
           },
-          rescale: [
-            [-30, 5],
-            [2, 18],
-            [-20, 0],
-          ],
+          style: {
+            kind: "rgb",
+            channels: [
+              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+              withRescale(
+                mul(constant(10), log10(div(band(1), band(2)))),
+                [2, 18],
+              ),
+              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+            ],
+          },
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
           label: "Custom RGB Composite",
-          variables: NISAR_GCOV_VARIABLES,
-          params: NISAR_GCOV_COMMON_PARAMS,
-          rgbExpression: {
-            options: NISAR_GCOV_RGB_OPTIONS,
-            defaults: ["hh", "hv", "ratio"],
+          fetch: {
+            variables: NISAR_GCOV_VARIABLES,
+            params: NISAR_GCOV_COMMON_PARAMS,
+          },
+          style: {
+            kind: "rgb",
+            channels: [
+              { selectorKey: "rgb_r" },
+              { selectorKey: "rgb_g" },
+              { selectorKey: "rgb_b" },
+            ],
+            selectors: [
+              {
+                key: "rgb_r",
+                label: "Red",
+                options: NISAR_GCOV_RGB_OPTIONS,
+                default: "hh",
+              },
+              {
+                key: "rgb_g",
+                label: "Green",
+                options: NISAR_GCOV_RGB_OPTIONS,
+                default: "hv",
+              },
+              {
+                key: "rgb_b",
+                label: "Blue",
+                options: NISAR_GCOV_RGB_OPTIONS,
+                default: "ratio",
+              },
+            ],
           },
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
@@ -420,23 +600,34 @@ export const DATASETS: DatasetConfig[] = [
       renders: [
         {
           label: "Sea Surface Temperature",
-          variables: ["analysed_sst"],
-          params: {
-            expression: "analysed_sst-273.15",
-            colormap_name: "nipy_spectral",
+          fetch: {
+            variables: ["analysed_sst"],
           },
-          rescale: [[-2, 29]],
-          units: "°C",
+          style: {
+            kind: "scalar",
+            expression: sub(band(1), constant(273.15)),
+            rescale: [-2, 29],
+            colormapName: "nipy_spectral",
+            colormapParamKey: "colormap",
+            colormapOptions: [...SCALAR_COLORMAP_OPTIONS],
+            nodata: -273.15,
+            units: "°C",
+          },
         },
         {
           label: "Sea Ice Fraction",
-          variables: ["sea_ice_fraction"],
-          params: {
-            expression: "100*sea_ice_fraction",
-            colormap_name: "blues_r",
+          fetch: {
+            variables: ["sea_ice_fraction"],
           },
-          rescale: [[0, 100]],
-          units: "%",
+          style: {
+            kind: "scalar",
+            expression: mul(constant(100), band(1)),
+            rescale: [0, 100],
+            colormapName: "blues_r",
+            colormapParamKey: "colormap",
+            colormapOptions: [...SCALAR_COLORMAP_OPTIONS],
+            units: "%",
+          },
         },
       ],
     },
@@ -456,23 +647,36 @@ export const DATASETS: DatasetConfig[] = [
       renders: [
         {
           label: "Net Primary Productivity (NPP)",
-          variables: ["NPP"],
-          params: {
-            expression: "86400000*NPP",
-            colormap_name: "rdylgn",
+          fetch: {
+            variables: ["NPP"],
           },
-          rescale: [[-4, 4]],
-          units: "g C m⁻² day⁻¹",
+          style: {
+            kind: "scalar",
+            expression: mul(constant(86400000), band(1)),
+            rescale: [-4, 4],
+            colormapName: "rdylgn",
+            colormapParamKey: "colormap",
+            colormapOptions: [...SCALAR_COLORMAP_OPTIONS],
+            units: "g C m⁻² day⁻¹",
+          },
         },
         {
           label: "Net Biosphere Exchange (NBE)",
-          variables: ["NEE", "FIRE", "FUEL"],
-          params: {
-            expression: "86400000*(NEE+FIRE+FUEL)",
-            colormap_name: "rdylgn",
+          fetch: {
+            variables: ["NEE", "FIRE", "FUEL"],
           },
-          rescale: [[-4, 4]],
-          units: "g C m⁻² day⁻¹",
+          style: {
+            kind: "scalar",
+            expression: mul(
+              constant(86400000),
+              add(add(band(1), band(2)), band(3)),
+            ),
+            rescale: [-4, 4],
+            colormapName: "rdylgn",
+            colormapParamKey: "colormap",
+            colormapOptions: [...SCALAR_COLORMAP_OPTIONS],
+            units: "g C m⁻² day⁻¹",
+          },
         },
       ],
     },

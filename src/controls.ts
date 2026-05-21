@@ -507,52 +507,90 @@ function renderExtraParams(
   };
 }
 
-function renderRgbExpressionControls(
+type RenderStyleControl = {
+  key: string;
+  label: string;
+  default: string;
+  options: { label: string; value: string }[];
+};
+
+function getRenderStyleControls(render: RenderConfig): {
+  title: string;
+  controls: RenderStyleControl[];
+} {
+  if (render.style.kind === "rgb") {
+    return {
+      title: "RGB Channels",
+      controls: (render.style.selectors ?? []).map((selector) => ({
+        key: selector.key,
+        label: `${selector.label} Channel`,
+        default: selector.default,
+        options: selector.options.map((option) => ({
+          label: option.label,
+          value: option.value,
+        })),
+      })),
+    };
+  }
+
+  if (render.style.colormapParamKey && render.style.colormapOptions?.length) {
+    return {
+      title: "Style",
+      controls: [
+        {
+          key: render.style.colormapParamKey,
+          label: "Colormap",
+          default: render.style.colormapName,
+          options: render.style.colormapOptions,
+        },
+      ],
+    };
+  }
+
+  return { title: "", controls: [] };
+}
+
+function renderStyleSelectorControls(
   container: HTMLElement,
   render: RenderConfig,
   onChange: () => void,
   initialValues?: Record<string, string | string[]>
 ): () => Record<string, string> {
+  const { title: groupTitle, controls } = getRenderStyleControls(render);
   container.innerHTML = "";
-  container.hidden = !render.rgbExpression;
-  if (!render.rgbExpression) return () => ({});
+  container.hidden = controls.length === 0;
+  if (controls.length === 0) return () => ({});
 
   const title = document.createElement("div");
   title.className = "rgb-controls-title";
-  title.textContent = "RGB Channels";
+  title.textContent = groupTitle;
   container.appendChild(title);
 
   const getters: Array<() => [string, string]> = [];
-  const channelDefs: Array<{ key: "rgb_r" | "rgb_g" | "rgb_b"; label: string }> = [
-    { key: "rgb_r", label: "Red" },
-    { key: "rgb_g", label: "Green" },
-    { key: "rgb_b", label: "Blue" },
-  ];
 
-  channelDefs.forEach(({ key, label }, idx) => {
-    const id = `rgb-${key}`;
+  controls.forEach((control) => {
+    const id = `selector-${control.key}`;
     const select = makeSelect(id);
 
-    for (const opt of render.rgbExpression!.options) {
+    for (const opt of control.options) {
       const el = document.createElement("option");
       el.value = opt.value;
       el.textContent = opt.label;
       select.appendChild(el);
     }
 
-    const stored = initialValues?.[key];
+    const stored = initialValues?.[control.key];
     const initial = Array.isArray(stored) ? stored[0] : stored;
-    const fallback = render.rgbExpression!.defaults[idx];
     const nextValue =
       initial !== undefined && Array.from(select.options).some((o) => o.value === initial)
         ? initial
-        : fallback;
+        : control.default;
     select.value = nextValue;
     select.addEventListener("change", onChange);
 
-    container.appendChild(makeLabel(`${label} Channel`, id));
+    container.appendChild(makeLabel(control.label, id));
     container.appendChild(select);
-    getters.push(() => [key, select.value]);
+    getters.push(() => [control.key, select.value]);
   });
 
   return () => Object.fromEntries(getters.map((g) => g()));
@@ -731,7 +769,7 @@ export function initControls(
   function onRenderChange(initialRenderParams?: Record<string, string | string[]>): void {
     const collection = getSelectedCollection(getSelectedDataset());
     const render = getSelectedRender(collection);
-    readRenderParams = renderRgbExpressionControls(
+    readRenderParams = renderStyleSelectorControls(
       renderOptions,
       render,
       () => onChange(getState()),

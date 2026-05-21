@@ -10,7 +10,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "strict": true
+    "strict": true,
+    "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "vitest.config.ts"]
 }
