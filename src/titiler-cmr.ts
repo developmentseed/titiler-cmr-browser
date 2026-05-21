@@ -13,8 +13,6 @@ import {
 
 const WEB_MERCATOR_WORLD_BOUNDS = 20037508.342789244;
 const STYLE_PARAM_KEYS = new Set([
-  "expression",
-  "rescale",
   "colormap_name",
   "color_formula",
 ]);
@@ -108,8 +106,9 @@ function buildBandParams(
   source: ActiveSourceDefinition,
   bandRequest: RawBandRequestSpec,
 ): Record<string, string | string[]> {
-  // Raw band requests intentionally exclude style-only params; sourceKey and
-  // bandRequestKey already capture the fetch-affecting inputs upstream.
+  // Raw band requests intentionally exclude display-only params such as
+  // server-side colormaps, but may include source-affecting transforms such as
+  // server-side expressions when a dataset needs them for GPU-safe values.
   return {
     collection_concept_id: source.collectionConceptId,
     datetime: source.datetime,

@@ -131,6 +131,27 @@ describe("deriveRasterState", () => {
     });
   });
 
+  it("derives MiCASA scalar styles with server-side pre-scaling and GPU-friendly client expressions", () => {
+    const state = makeState({
+      datasetId: "micasa",
+      renderLabel: "Net Primary Productivity (NPP)",
+      datetime: "2024-12-31T00:00:00Z/2024-12-31T23:59:59Z",
+    });
+
+    const [source] = deriveActiveSources(state);
+    const style = deriveClientRenderPlan(state);
+
+    expect(source.variables).toEqual(["NPP"]);
+    expect(source.params).toEqual({ expression: "86400000*b1" });
+    expect(style).toMatchObject({
+      kind: "scalar",
+      expression: { op: "band", band: 1 },
+      rescale: [-4, 4],
+      colormapName: "rdylgn",
+      units: "g C m⁻² day⁻¹",
+    });
+  });
+
   it("treats NISAR custom RGB selector changes as style-only and keeps band requests stable", () => {
     const base = makeState({
       datasetId: "nisar-gcov",

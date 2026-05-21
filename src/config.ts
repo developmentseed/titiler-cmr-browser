@@ -647,10 +647,15 @@ export const DATASETS: DatasetConfig[] = [
           label: "Net Primary Productivity (NPP)",
           fetch: {
             variables: ["NPP"],
+            // MiCASA values are tiny in the raw xarray output; pre-scale on the
+            // server so the GPU path does not lose nearly all variation.
+            params: {
+              expression: "86400000*b1",
+            },
           },
           style: {
             kind: "scalar",
-            expression: mul(constant(86400000), band(1)),
+            expression: band(1),
             rescale: [-4, 4],
             colormapName: "rdylgn",
             colormapParamKey: "colormap",
@@ -662,13 +667,15 @@ export const DATASETS: DatasetConfig[] = [
           label: "Net Biosphere Exchange (NBE)",
           fetch: {
             variables: ["NEE", "FIRE", "FUEL"],
+            // Each requested variable is fetched separately, so `b1` refers to
+            // the current variable tile and can be pre-scaled independently.
+            params: {
+              expression: "86400000*b1",
+            },
           },
           style: {
             kind: "scalar",
-            expression: mul(
-              constant(86400000),
-              add(add(band(1), band(2)), band(3)),
-            ),
+            expression: add(add(band(1), band(2)), band(3)),
             rescale: [-4, 4],
             colormapName: "rdylgn",
             colormapParamKey: "colormap",

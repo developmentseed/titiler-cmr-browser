@@ -70,8 +70,8 @@ describe("titiler-cmr", () => {
     expect(url).toContain("assets=B02");
     expect(url).toContain("attribute=a");
     expect(url).toContain("attribute=b");
-    expect(url).not.toContain("expression=");
-    expect(url).not.toContain("rescale=");
+    expect(url).toContain("expression=b1%2Fb2");
+    expect(url).toContain("rescale=0%2C1");
     expect(url).not.toContain("colormap_name=");
     expect(url).not.toContain("color_formula=");
   });
