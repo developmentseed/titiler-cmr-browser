@@ -87,8 +87,6 @@ export type RenderConfig = {
   label: string;
   fetch: FetchConfig;
   style: StyleConfig;
-  /** Optional server-side styling params for TileJSON/image tile rendering. */
-  serverParams?: Record<string, string | string[]>;
   /** When present, produces one map layer per entry instead of a single layer. */
   subLayers?: SubLayerSpec[];
 };

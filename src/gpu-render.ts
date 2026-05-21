@@ -212,12 +212,12 @@ function createToneAdjustmentModule(adjustments: ToneAdjustment[]): RasterModule
   adjusted = pow(adjusted, vec3(1.0 / max(${TONE_MODULE_NAME}.gamma, 0.0001)));
   float luma = dot(adjusted, vec3(0.2126, 0.7152, 0.0722));
   adjusted = clamp(vec3(luma) + (adjusted - vec3(luma)) * ${TONE_MODULE_NAME}.saturation, 0.0, 1.0);
-  if (${TONE_MODULE_NAME}.sigmoidalContrast > 0.0) {
-    adjusted = clamp(
-      1.0 / (1.0 + exp(-${TONE_MODULE_NAME}.sigmoidalContrast * (adjusted - vec3(${TONE_MODULE_NAME}.sigmoidalBias)))),
-      0.0,
-      1.0
-    );
+  if (abs(${TONE_MODULE_NAME}.sigmoidalContrast) > 0.000001) {
+    vec3 low = vec3(1.0 / (1.0 + exp(${TONE_MODULE_NAME}.sigmoidalContrast * ${TONE_MODULE_NAME}.sigmoidalBias)));
+    vec3 high = vec3(1.0 / (1.0 + exp(${TONE_MODULE_NAME}.sigmoidalContrast * (${TONE_MODULE_NAME}.sigmoidalBias - 1.0))));
+    vec3 numerator = 1.0 / (1.0 + exp(${TONE_MODULE_NAME}.sigmoidalContrast * (vec3(${TONE_MODULE_NAME}.sigmoidalBias) - adjusted))) - low;
+    vec3 denominator = max(high - low, vec3(0.000001));
+    adjusted = clamp(numerator / denominator, 0.0, 1.0);
   }
   color = vec4(adjusted, color.a);
 `,

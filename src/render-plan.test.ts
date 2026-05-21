@@ -80,6 +80,19 @@ function makeMaskedHlsTile(): DecodedTileData {
   };
 }
 
+function makeColormapLut(entries: Record<number, [number, number, number, number]>): Uint8ClampedArray {
+  const lut = new Uint8ClampedArray(256 * 4);
+  for (const [indexText, rgba] of Object.entries(entries)) {
+    const index = Number(indexText);
+    const offset = index * 4;
+    lut[offset] = rgba[0];
+    lut[offset + 1] = rgba[1];
+    lut[offset + 2] = rgba[2];
+    lut[offset + 3] = rgba[3];
+  }
+  return lut;
+}
+
 describe("compileRenderPlan", () => {
   it("compiles scalar styles into expression -> rescale -> colormap steps", () => {
     const state = makeState({
@@ -218,7 +231,7 @@ describe("compileRenderPlan", () => {
     ]);
   });
 
-  it("renders scalar nodata pixels as transparent in CPU fallback", () => {
+  it("renders scalar fallback pixels with the configured colormap instead of grayscale", () => {
     const state = makeState({
       datasetId: "mur-sst",
       renderLabel: "Sea Surface Temperature",
@@ -238,6 +251,9 @@ describe("compileRenderPlan", () => {
       height: 1,
       byteLength: 8,
       bandTextures: [],
+      cpuColormapLut: makeColormapLut({
+        16: [12, 34, 56, 255],
+      }),
       ndarray: {
         data: new Float32Array([273.15, 0]),
         dtype: "f4",
@@ -251,9 +267,44 @@ describe("compileRenderPlan", () => {
     });
 
     expect(Array.from(image.data)).toEqual([
-      16, 16, 16, 255,
+      12, 34, 56, 255,
       0, 0, 0, 0,
     ]);
+  });
+
+  it("fails explicitly when scalar CPU fallback lacks the configured colormap", () => {
+    const state = makeState({
+      datasetId: "mur-sst",
+      renderLabel: "Sea Surface Temperature",
+      datetime: "2026-05-19T00:00:00Z/2026-05-19T23:59:59Z",
+    });
+
+    const compiled = compileRenderPlan(deriveClientRenderPlan(state));
+
+    expect(compiled.kind).toBe("scalar");
+    if (compiled.kind !== "scalar") {
+      throw new Error("Expected scalar render plan");
+    }
+
+    expect(() =>
+      compiled.renderTile({
+        device: {} as never,
+        width: 1,
+        height: 1,
+        byteLength: 4,
+        bandTextures: [],
+        ndarray: {
+          data: new Float32Array([273.15]),
+          dtype: "f4",
+          shape: [1, 1],
+          fortranOrder: false,
+          width: 1,
+          height: 1,
+          bandCount: 1,
+          byteLength: 4,
+        },
+      }),
+    ).toThrow(/colormap lookup table/);
   });
 
   it("uses fixed rescale ranges for preset NISAR RGB renders so tiles share one scale", () => {

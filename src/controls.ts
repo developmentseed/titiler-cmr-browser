@@ -100,6 +100,45 @@ function makeDateInput(id: string): HTMLInputElement {
   return el;
 }
 
+function applyInputDateBounds(
+  inputs: HTMLInputElement[],
+  range: { BeginningDateTime?: string; EndingDateTime?: string; EndsAtPresentFlag?: boolean } | undefined,
+  startSlice: number,
+  endSlice: number,
+): void {
+  if (range?.BeginningDateTime) {
+    const min = range.BeginningDateTime.slice(0, startSlice);
+    inputs.forEach((input) => {
+      input.min = min;
+    });
+  }
+
+  if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
+    const max = range.EndingDateTime.slice(0, endSlice);
+    inputs.forEach((input) => {
+      if (max < input.max) {
+        input.max = max;
+      }
+    });
+  }
+}
+
+function syncCollectionDateBounds(
+  collectionConceptId: string,
+  inputs: HTMLInputElement[],
+  startSlice: number,
+  endSlice = startSlice,
+): void {
+  void fetchMetadata(collectionConceptId).then((umm) => {
+    applyInputDateBounds(
+      inputs,
+      umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0],
+      startSlice,
+      endSlice,
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Date controls rendering
 // ---------------------------------------------------------------------------
@@ -139,14 +178,7 @@ function renderDateControls(
     container.appendChild(makeLabel("Date", "date-input"));
     container.appendChild(input);
     inputs = [input];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYMD = range.EndingDateTime.slice(0, 10);
-        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 10);
     return () => {
       const d = input.value || defaultVal;
       return `${d}T00:00:00Z/${d}T23:59:59Z`;
@@ -162,14 +194,7 @@ function renderDateControls(
     container.appendChild(makeLabel("Week of", "date-input"));
     container.appendChild(input);
     inputs = [input];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYMD = range.EndingDateTime.slice(0, 10);
-        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 10);
     return () => weekDatetimeRange(input.value || defaultVal);
   } else if (collection.date.mode === "month") {
     onModeChange?.("month");
@@ -184,14 +209,7 @@ function renderDateControls(
     container.appendChild(makeLabel("Month", "month-input"));
     container.appendChild(input);
     inputs = [input];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 7)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYM = range.EndingDateTime.slice(0, 7);
-        inputs.forEach((el) => { if (endYM < el.max) el.max = endYM; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 7);
     return () => monthToDatetimeRange(input.value || defaultMonth);
   } else if (collection.date.mode === "switchable") {
     // Render mode tabs then delegate to the appropriate sub-renderer.
@@ -287,14 +305,7 @@ function renderDateControls(
     container.appendChild(makeLabel("End Date", "end-date-input"));
     container.appendChild(endInput);
     inputs = [startInput, endInput];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYMD = range.EndingDateTime.slice(0, 10);
-        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 10);
     return () => {
       const s = startInput.value || defaultStart;
       const e = endInput.value || defaultEnd;

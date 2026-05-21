@@ -1,20 +1,11 @@
-import { TITILER_ENDPOINT } from "./config";
+import { fetchColormap } from "./colormap";
 import type { LegendSpec } from "./state";
 
-type ColormapData = Record<string, [number, number, number, number]>;
-
-const cache = new Map<string, ColormapData>();
-
-async function fetchColormap(name: string): Promise<ColormapData> {
-  if (cache.has(name)) return cache.get(name)!;
-  const res = await fetch(`${TITILER_ENDPOINT}/colorMaps/${name}?f=json`);
-  const data: ColormapData = await res.json();
-  cache.set(name, data);
-  return data;
-}
-
 /** Draws the colormap vertically: index 255 (max) at top, index 0 (min) at bottom. */
-function drawGradient(canvas: HTMLCanvasElement, data: ColormapData): void {
+function drawGradient(
+  canvas: HTMLCanvasElement,
+  data: Record<string, [number, number, number, number]>,
+): void {
   canvas.width = 1;
   canvas.height = 256;
   const ctx = canvas.getContext("2d")!;

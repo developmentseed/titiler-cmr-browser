@@ -47,11 +47,11 @@ describe("tile-data", () => {
     expect(Array.from(assembled.data)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   });
 
-  it("assembles rasterio-style data-plus-alpha fetch units into RGB plus shared alpha", async () => {
+  it("assembles rasterio-style data-plus-alpha fetch units into RGB plus a conservative shared alpha", async () => {
     const tiles = await Promise.all([
-      decodeNpyTile(dump([1, 2, 3, 4, 100, 101, 102, 103], [2, 2, 2], { dtype: "u2" })),
-      decodeNpyTile(dump([5, 6, 7, 8, 100, 101, 102, 103], [2, 2, 2], { dtype: "u2" })),
-      decodeNpyTile(dump([9, 10, 11, 12, 100, 101, 102, 103], [2, 2, 2], { dtype: "u2" })),
+      decodeNpyTile(dump([1, 2, 3, 4, 100, 101, 0, 103], [2, 2, 2], { dtype: "u2" })),
+      decodeNpyTile(dump([5, 6, 7, 8, 99, 101, 102, 103], [2, 2, 2], { dtype: "u2" })),
+      decodeNpyTile(dump([9, 10, 11, 12, 100, 80, 102, 90], [2, 2, 2], { dtype: "u2" })),
     ]);
 
     const assembled = assembleBandTiles(tiles);
@@ -62,7 +62,7 @@ describe("tile-data", () => {
       1, 2, 3, 4,
       5, 6, 7, 8,
       9, 10, 11, 12,
-      100, 101, 102, 103,
+      99, 80, 0, 90,
     ]);
   });
 

@@ -153,4 +153,25 @@ describe("renderTileWithGpuModules", () => {
     const filterCode = maskModule?.inject?.["fs:DECKGL_FILTER_COLOR"] ?? "";
     expect(filterCode).toMatch(/maskValue > 0\.0/);
   });
+
+  it("normalizes sigmoidal tone adjustment the same way as the CPU renderer", () => {
+    const compiled = compileRenderPlan(
+      deriveClientRenderPlan(
+        makeState({
+          datasetId: "hls",
+          renderLabel: "True Color",
+          datetime: "2026-04-01T00:00:00Z/2026-04-30T23:59:59Z",
+        }),
+      ),
+    );
+
+    expect(compiled.kind).toBe("rgb");
+    const { renderPipeline } = renderTileWithGpuModules(makeTile(4), compiled);
+    const toneModule = renderPipeline[renderPipeline.length - 1]?.module;
+    const filterCode = toneModule?.inject?.["fs:DECKGL_FILTER_COLOR"] ?? "";
+    expect(filterCode).toMatch(/vec3 low/);
+    expect(filterCode).toMatch(/vec3 high/);
+    expect(filterCode).toMatch(/numerator \/ denominator/);
+    expect(filterCode).toMatch(/abs\(toneAdjust\.sigmoidalContrast\) > 0\.000001/);
+  });
 });

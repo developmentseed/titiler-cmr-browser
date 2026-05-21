@@ -16,10 +16,9 @@ import { initAbout } from "./about";
 import { initCollectionDetails } from "./collection-details";
 import { decodeState, encodeState, getRawDateFromDom } from "./url-state";
 import { exportMapImage } from "./export";
-import { deriveActiveSources, deriveRasterState } from "./state";
+import { deriveRasterState } from "./state";
 import { createDeckLayers } from "./deck-layers";
-import { getRasterProjection } from "./projection";
-import { clearServerLayers, setServerLayersVisible, updateServerLayers } from "./server-layers";
+import { getRasterProjection, type ZoomConstrainedLayer } from "./projection";
 import { loadWebMercatorQuadDescriptor, type TileMatrixSetDescriptor } from "./titiler-cmr";
 
 initAbout();
@@ -56,29 +55,24 @@ map.addControl(deckOverlay);
 
 const loadingTracker = createLoadingTracker();
 let activeDeckLayers: Layer[] = [];
+let activeDeckLayerZoomRanges: ZoomConstrainedLayer[] = [];
 
 function syncProjection(): void {
   if (!mapReady) {
     return;
   }
 
-  const type = getRasterProjection(cmrLayerVisible, activeDeckLayers.length);
+  const type = getRasterProjection(cmrLayerVisible, map.getZoom(), activeDeckLayerZoomRanges);
   if (map.getProjection()?.type !== type) {
     map.setProjection({ type });
   }
 }
 
-function setDeckLayers(layers: Layer[] = []): void {
+function setDeckLayers(layers: Layer[] = [], zoomRanges: ZoomConstrainedLayer[] = []): void {
   activeDeckLayers = layers;
+  activeDeckLayerZoomRanges = zoomRanges;
   deckOverlay.setProps({ layers: cmrLayerVisible ? activeDeckLayers : [] });
   syncProjection();
-}
-
-function syncServerLayerVisibility(): void {
-  if (!mapReady) {
-    return;
-  }
-  setServerLayersVisible(map, cmrLayerVisible);
 }
 
 map.addControl(new maplibregl.NavigationControl(), "bottom-right");
@@ -138,11 +132,7 @@ let labelsVisible = false;
 let labelLayerIds: string[] = [];
 
 function getLegendSpec() {
-  const state = getState();
-  if (state.render.serverParams) {
-    return { kind: "none" as const };
-  }
-  return deriveRasterState(state).layers[0]?.style.legend ?? { kind: "none" as const };
+  return deriveRasterState(getState()).layers[0]?.style.legend ?? { kind: "none" as const };
 }
 
 function refreshLayers(): void {
@@ -150,24 +140,19 @@ function refreshLayers(): void {
     return;
   }
 
-  const state = getState();
-
-  if (state.render.serverParams) {
-    clearServerLayers(map);
-    setDeckLayers([]);
-    updateServerLayers(map, deriveActiveSources(state), state.render.serverParams);
-    syncServerLayerVisibility();
-    return;
-  }
-
-  clearServerLayers(map);
+  const rasterState = deriveRasterState(getState());
   if (!tilesetDescriptor) {
     setDeckLayers([]);
     return;
   }
 
-  const rasterState = deriveRasterState(state);
-  setDeckLayers(createDeckLayers(rasterState, tilesetDescriptor, loadingTracker));
+  setDeckLayers(
+    createDeckLayers(rasterState, tilesetDescriptor, loadingTracker),
+    rasterState.layers.map((layer) => ({
+      minzoom: layer.minzoom,
+      maxzoom: layer.maxzoom,
+    })),
+  );
 }
 
 function setLabelsVisible(visible: boolean): void {
@@ -221,8 +206,7 @@ controlsEl.appendChild(mapSection);
 layerToggle.addEventListener("click", () => {
   cmrLayerVisible = !cmrLayerVisible;
   layerToggle.classList.toggle("active", cmrLayerVisible);
-  setDeckLayers(activeDeckLayers);
-  syncServerLayerVisibility();
+  setDeckLayers(activeDeckLayers, activeDeckLayerZoomRanges);
 });
 
 labelToggle.addEventListener("click", () => {
@@ -270,6 +254,8 @@ map.on("load", () => {
   updateLegend(getLegendSpec());
   updateUrl();
 });
+
+map.on("zoom", syncProjection);
 
 map.on("moveend", () => {
   if (mapReady) updateUrl();

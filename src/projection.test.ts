@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { getRasterProjection } from "./projection";
 
 describe("getRasterProjection", () => {
-  it("uses Mercator when deck raster layers are visible", () => {
-    expect(getRasterProjection(true, 1)).toBe("mercator");
-    expect(getRasterProjection(true, 3)).toBe("mercator");
+  it("uses Mercator only when a visible deck raster layer is renderable at the current zoom", () => {
+    expect(getRasterProjection(true, 5, [{ minzoom: 6 }, { minzoom: 10 }])).toBe("globe");
+    expect(getRasterProjection(true, 6, [{ minzoom: 6 }, { minzoom: 10 }])).toBe("mercator");
+    expect(getRasterProjection(true, 10, [{ minzoom: 6, maxzoom: 10 }, { minzoom: 10 }])).toBe("mercator");
   });
 
-  it("keeps Globe when no raster deck layer is being drawn", () => {
-    expect(getRasterProjection(true, 0)).toBe("globe");
-    expect(getRasterProjection(false, 2)).toBe("globe");
+  it("keeps Globe when deck raster layers are hidden or absent", () => {
+    expect(getRasterProjection(true, 5, [])).toBe("globe");
+    expect(getRasterProjection(false, 8, [{ minzoom: 6 }])).toBe("globe");
   });
 });

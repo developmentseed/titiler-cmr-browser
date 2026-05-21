@@ -165,8 +165,13 @@ export function assembleBandTiles(tiles: NdArrayTile[]): NdArrayTile {
   const dtype = dtypes.size === 1 ? first.dtype : "f4";
   const dataBands = tiles.map((tile) => getBandValues(tile, 0));
   const allHaveSharedAlpha = tiles.every((tile) => tile.bandCount === 2);
+  const alphaBand = allHaveSharedAlpha
+    ? tiles
+        .map((tile) => getBandValues(tile, 1))
+        .reduce((composite, band) => composite.map((value, index) => Math.min(value, band[index])))
+    : null;
   const values = allHaveSharedAlpha
-    ? [...dataBands.flat(), ...getBandValues(first, 1)]
+    ? [...dataBands.flat(), ...alphaBand!]
     : dataBands.flat();
   const data = makeTileArray(dtype, values);
   const bandCount = dataBands.length + (allHaveSharedAlpha ? 1 : 0);

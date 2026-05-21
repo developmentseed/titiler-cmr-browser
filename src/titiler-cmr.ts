@@ -42,6 +42,7 @@ export type GpuTileData = {
   byteLength: number;
   bandTextures: Texture[];
   colormapTexture?: Texture;
+  cpuColormapLut?: Uint8ClampedArray;
 };
 
 export type DecodedTileData = GpuTileData;

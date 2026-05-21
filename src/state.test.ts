@@ -6,7 +6,6 @@ import {
   deriveActiveSources,
   deriveClientRenderPlan,
   deriveRasterState,
-  isStyleOnlyParamChange,
 } from "./state";
 
 function getDataset(id: string): DatasetConfig {
@@ -166,7 +165,6 @@ describe("deriveRasterState", () => {
       variantSources.map((item) => item.rawBandRequests.map((request) => request.bandRequestKey)),
     );
     expect(baseStyle.styleKey).not.toBe(variantStyle.styleKey);
-    expect(isStyleOnlyParamChange(base, variant)).toBe(true);
   });
 
   it("treats scalar colormap changes as style-only and keeps band requests stable", () => {
@@ -192,7 +190,6 @@ describe("deriveRasterState", () => {
       kind: "scalar",
       colormapName: "turbo",
     });
-    expect(isStyleOnlyParamChange(base, variant)).toBe(true);
   });
 
   it("changes band request keys when source-affecting filters change", () => {

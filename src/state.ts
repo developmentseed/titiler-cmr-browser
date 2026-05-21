@@ -446,17 +446,3 @@ export function deriveRasterState(state: ControlState): DerivedRasterState {
   };
 }
 
-export function isStyleOnlyParamChange(
-  previous: ControlState,
-  next: ControlState,
-): boolean {
-  const previousSources = deriveActiveSources(previous).map((source) => source.sourceKey);
-  const nextSources = deriveActiveSources(next).map((source) => source.sourceKey);
-  const previousStyle = deriveClientRenderPlan(previous).styleKey;
-  const nextStyle = deriveClientRenderPlan(next).styleKey;
-
-  return (
-    stableSerialize(previousSources) === stableSerialize(nextSources) &&
-    previousStyle !== nextStyle
-  );
-}

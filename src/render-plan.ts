@@ -1,3 +1,4 @@
+import { sampleColormap } from "./colormap";
 import type { DecodedTileData } from "./titiler-cmr";
 import type {
   ClientRenderPlan,
@@ -16,6 +17,7 @@ export type CompiledScalarRenderPlan = {
   kind: "scalar";
   styleKey: string;
   steps: [ScalarRenderStep, ScalarRenderStep, ScalarRenderStep];
+  colormapName: string;
   nodata?: number;
   alphaBand?: number;
   renderTile: (tile: DecodedTileData) => ImageData;
@@ -191,6 +193,12 @@ function applyAdjustments(
 }
 
 function renderScalarTile(style: ResolvedScalarStylePlan, tile: DecodedTileData): ImageData {
+  if (!tile.cpuColormapLut) {
+    throw new Error(
+      `Scalar CPU fallback requires the ${style.colormapName} colormap lookup table.`,
+    );
+  }
+
   const pixelCount = tile.width * tile.height;
   const rgba = new Uint8ClampedArray(pixelCount * 4);
   const alphaValues = style.alphaBand
@@ -210,12 +218,11 @@ function renderScalarTile(style: ResolvedScalarStylePlan, tile: DecodedTileData)
       continue;
     }
 
-    const normalized = normalize(value, style.rescale);
-    const channel = Math.round(normalized * 255);
-    rgba[offset] = channel;
-    rgba[offset + 1] = channel;
-    rgba[offset + 2] = channel;
-    rgba[offset + 3] = 255;
+    const [r, g, b, a] = sampleColormap(tile.cpuColormapLut, normalize(value, style.rescale));
+    rgba[offset] = r;
+    rgba[offset + 1] = g;
+    rgba[offset + 2] = b;
+    rgba[offset + 3] = a;
   }
 
   return new ImageData(rgba, tile.width, tile.height);
@@ -278,6 +285,7 @@ export function compileRenderPlan(style: ClientRenderPlan): CompiledRenderPlan {
         { kind: "linear-rescale", range: style.rescale },
         { kind: "colormap", colormapName: style.colormapName },
       ],
+      colormapName: style.colormapName,
       nodata: style.nodata,
       alphaBand: style.alphaBand,
       renderTile: (tile) => renderScalarTile(style, tile),
