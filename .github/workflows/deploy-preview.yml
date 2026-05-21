@@ -1,0 +1,71 @@
+name: Deploy Branch Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      subdir:
+        description: "Subdirectory to deploy to (defaults to sanitized branch name)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Determine subdirectory name
+        id: subdir
+        run: |
+          if [ -n "${{ inputs.subdir }}" ]; then
+            echo "name=${{ inputs.subdir }}" >> $GITHUB_OUTPUT
+          else
+            BRANCH="${GITHUB_REF#refs/heads/}"
+            echo "name=${BRANCH//\//-}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          path: branch-build
+
+      - run: npm ci
+        working-directory: branch-build
+
+      - name: Build branch with subdirectory base path
+        run: npx vite build --base /titiler-cmr-browser/${{ steps.subdir.outputs.name }}/
+        working-directory: branch-build
+
+      - run: cp -r branch-build/dist/. dist/${{ steps.subdir.outputs.name }}/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
