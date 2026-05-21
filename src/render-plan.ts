@@ -71,18 +71,20 @@ export function evaluateStyleExpression(
     case "log10":
       return Math.log10(evaluateStyleExpression(expression.arg, tile, pixelIndex));
     case "add":
-      return expression.args
-        .map((arg) => evaluateStyleExpression(arg, tile, pixelIndex))
-        .reduce((left, right) => left + right);
+      return (
+        evaluateStyleExpression(expression.args[0], tile, pixelIndex) +
+        evaluateStyleExpression(expression.args[1], tile, pixelIndex)
+      );
     case "sub":
       return (
         evaluateStyleExpression(expression.args[0], tile, pixelIndex) -
         evaluateStyleExpression(expression.args[1], tile, pixelIndex)
       );
     case "mul":
-      return expression.args
-        .map((arg) => evaluateStyleExpression(arg, tile, pixelIndex))
-        .reduce((left, right) => left * right);
+      return (
+        evaluateStyleExpression(expression.args[0], tile, pixelIndex) *
+        evaluateStyleExpression(expression.args[1], tile, pixelIndex)
+      );
     case "div":
       return (
         evaluateStyleExpression(expression.args[0], tile, pixelIndex) /

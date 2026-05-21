@@ -46,24 +46,24 @@ function makeState(args: {
   };
 }
 
-function makeTile(): GpuTileData {
+function makeTile(bandCount = 1): GpuTileData {
   const texture = { destroy() {} } as never;
   return {
     device: {} as never,
     width: 2,
     height: 2,
-    byteLength: 16,
+    byteLength: 16 * bandCount,
     ndarray: {
-      data: new Float32Array([1, 2, 3, 4]),
+      data: new Float32Array(4 * bandCount).fill(1),
       dtype: "f4",
-      shape: [2, 2],
+      shape: bandCount === 1 ? [2, 2] : [bandCount, 2, 2],
       fortranOrder: false,
       width: 2,
       height: 2,
-      bandCount: 1,
-      byteLength: 16,
+      bandCount,
+      byteLength: 16 * bandCount,
     },
-    bandTextures: [texture],
+    bandTextures: Array.from({ length: bandCount }, () => texture),
   };
 }
 
@@ -90,7 +90,7 @@ describe("renderTileWithGpuModules", () => {
     expect(filterCode).toMatch(/\breturn\b/);
   });
 
-  it("throws for RGB plans without one shared channel rescale so callers can fall back to CPU rendering", () => {
+  it("supports RGB plans with independent per-channel rescale ranges on the GPU", () => {
     const compiled = compileRenderPlan(
       deriveClientRenderPlan(
         makeState({
@@ -102,12 +102,17 @@ describe("renderTileWithGpuModules", () => {
     );
 
     expect(compiled.kind).toBe("rgb");
-    expect(() => renderTileWithGpuModules(makeTile(), compiled)).toThrow(
-      /shared rescale range/,
-    );
+    const { renderPipeline } = renderTileWithGpuModules(makeTile(2), compiled);
+    const rescaleModule = renderPipeline[1]?.module;
+    const filterCode = rescaleModule?.inject?.["fs:DECKGL_FILTER_COLOR"] ?? "";
+    expect(filterCode).toMatch(/rgbPerChannelRescale/);
+    expect(renderPipeline[1]?.props).toMatchObject({
+      rescaleMin: [-20, -30, 2],
+      rescaleMax: [0, 5, 18],
+    });
   });
 
-  it("throws for RGB plans with different per-channel rescale ranges so callers can fall back to CPU rendering", () => {
+  it("supports selector-driven RGB plans with different per-channel rescale ranges on the GPU", () => {
     const compiled = compileRenderPlan(
       deriveClientRenderPlan(
         makeState({
@@ -124,8 +129,28 @@ describe("renderTileWithGpuModules", () => {
     );
 
     expect(compiled.kind).toBe("rgb");
-    expect(() => renderTileWithGpuModules(makeTile(), compiled)).toThrow(
-      /shared rescale range/,
+    const { renderPipeline } = renderTileWithGpuModules(makeTile(2), compiled);
+    expect(renderPipeline[1]?.props).toMatchObject({
+      rescaleMin: [2, -20, -30],
+      rescaleMax: [18, 0, 5],
+    });
+  });
+
+  it("uses positive alpha-mask filtering for RGB plans with an alpha band", () => {
+    const compiled = compileRenderPlan(
+      deriveClientRenderPlan(
+        makeState({
+          datasetId: "hls",
+          renderLabel: "True Color",
+          datetime: "2026-04-01T00:00:00Z/2026-04-30T23:59:59Z",
+        }),
+      ),
     );
+
+    expect(compiled.kind).toBe("rgb");
+    const { renderPipeline } = renderTileWithGpuModules(makeTile(4), compiled);
+    const maskModule = renderPipeline[1]?.module;
+    const filterCode = maskModule?.inject?.["fs:DECKGL_FILTER_COLOR"] ?? "";
+    expect(filterCode).toMatch(/maskValue > 0\.0/);
   });
 });

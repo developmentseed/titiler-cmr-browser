@@ -32,7 +32,7 @@ function hashString(value: string): string {
 }
 
 export function getDeckLayerId(layer: DerivedLayerState, index: number): string {
-  return `cmr-${index}-${hashString(layer.source.sourceKey)}`;
+  return `cmr-${index}-${hashString(`${layer.source.sourceKey}/${layer.style.styleKey}`)}`;
 }
 
 export function createDeckLayer(
@@ -62,9 +62,6 @@ export function createDeckLayer(
     renderTile: (data) => {
       if (!data) {
         return null;
-      }
-      if (compiled.kind === "rgb" && compiled.alphaBand !== undefined) {
-        return { image: compiled.renderTile(data) };
       }
       try {
         return renderTileWithGpuModules(data, compiled);

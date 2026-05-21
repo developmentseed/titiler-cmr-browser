@@ -92,7 +92,7 @@ describe("createDeckLayers", () => {
     expect(layers.map((layer) => layer.props.maxZoom)).toEqual([10, 13]);
   });
 
-  it("keeps layer identity stable across style-only changes while updating renderTile triggers", () => {
+  it("recreates layer identity across style-only changes so GPU pipeline updates apply immediately", () => {
     const base = deriveRasterState(
       makeState({
         datasetId: "nisar-gcov",
@@ -121,7 +121,7 @@ describe("createDeckLayers", () => {
     const baseLayers = createDeckLayers(base, descriptorStub) as unknown as LayerWithProps[];
     const variantLayers = createDeckLayers(variant, descriptorStub) as unknown as LayerWithProps[];
 
-    expect(baseLayers.map((layer) => layer.id)).toEqual(variantLayers.map((layer) => layer.id));
+    expect(baseLayers.map((layer) => layer.id)).not.toEqual(variantLayers.map((layer) => layer.id));
     expect(baseLayers[0].props.updateTriggers.renderTile).not.toEqual(
       variantLayers[0].props.updateTriggers.renderTile,
     );

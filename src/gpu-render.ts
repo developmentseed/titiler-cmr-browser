@@ -7,7 +7,6 @@ import {
   decodeColormapSprite,
   FilterNoDataVal,
   LinearRescale,
-  MaskTexture,
   type RasterModule,
 } from "@developmentseed/deck.gl-raster/gpu-modules";
 import colormapSpriteUrl from "@developmentseed/deck.gl-raster/gpu-modules/colormaps.png";
@@ -16,6 +15,10 @@ import type { CompiledRenderPlan } from "./render-plan";
 import type { GpuTileData } from "./titiler-cmr";
 
 const DEFAULT_UV_TRANSFORM = [0, 0, 1, 1] as const;
+const EXPR_MODULE_NAME = "expr";
+const POSITIVE_MASK_MODULE_NAME = "positiveMask";
+const RGB_RESCALE_MODULE_NAME = "rgbPerChannelRescale";
+const TONE_MODULE_NAME = "toneAdjust";
 
 type ExprModuleProps = {
   band0: Texture;
@@ -29,6 +32,15 @@ type ToneModuleProps = {
   saturation: number;
   sigmoidalContrast: number;
   sigmoidalBias: number;
+};
+
+type PositiveMaskModuleProps = {
+  maskTexture: Texture;
+};
+
+type RgbRescaleModuleProps = {
+  rescaleMin: readonly [number, number, number];
+  rescaleMax: readonly [number, number, number];
 };
 
 const colormapTextureCache = new WeakMap<Device, Promise<Texture>>();
@@ -81,16 +93,20 @@ function createExpressionModule(plan: CompiledRenderPlan): ShaderModule<ExprModu
   color = vec4(scalar, scalar, scalar, 1.0);
 `
       : `
-  color = vec4(
+  vec3 rgb = vec3(
     ${compileExpressionGlsl(plan.channels[0].expression)},
     ${compileExpressionGlsl(plan.channels[1].expression)},
-    ${compileExpressionGlsl(plan.channels[2].expression)},
-    1.0
+    ${compileExpressionGlsl(plan.channels[2].expression)}
   );
+  if (any(isnan(rgb)) || any(isinf(rgb))) {
+    color = vec4(0.0, 0.0, 0.0, 0.0);
+    return;
+  }
+  color = vec4(rgb, 1.0);
 `;
 
   return {
-    name: `expr-${plan.styleKey}`,
+    name: EXPR_MODULE_NAME,
     inject: {
       "fs:#decl": samplerDecl,
       "fs:DECKGL_FILTER_COLOR": expressionBody,
@@ -100,6 +116,49 @@ function createExpressionModule(plan: CompiledRenderPlan): ShaderModule<ExprModu
       band1: props.band1,
       band2: props.band2,
       band3: props.band3,
+    }),
+  };
+}
+
+function createPositiveMaskModule(): ShaderModule<PositiveMaskModuleProps> {
+  return {
+    name: POSITIVE_MASK_MODULE_NAME,
+    inject: {
+      "fs:#decl": "uniform sampler2D maskTexture;",
+      "fs:DECKGL_FILTER_COLOR": `
+  float maskValue = texture(maskTexture, geometry.uv).r;
+  if (!(maskValue > 0.0)) {
+    discard;
+  }
+`,
+    },
+    getUniforms: (props) => ({
+      maskTexture: props.maskTexture,
+    }),
+  };
+}
+
+function createRgbRescaleModule(): ShaderModule<RgbRescaleModuleProps> {
+  return {
+    name: RGB_RESCALE_MODULE_NAME,
+    fs: `uniform ${RGB_RESCALE_MODULE_NAME}Uniforms {
+  vec3 rescaleMin;
+  vec3 rescaleMax;
+} ${RGB_RESCALE_MODULE_NAME};
+`,
+    uniformTypes: {
+      rescaleMin: "vec3<f32>",
+      rescaleMax: "vec3<f32>",
+    },
+    inject: {
+      "fs:DECKGL_FILTER_COLOR": `
+  vec3 denominator = max(${RGB_RESCALE_MODULE_NAME}.rescaleMax - ${RGB_RESCALE_MODULE_NAME}.rescaleMin, vec3(0.000001));
+  color.rgb = clamp((color.rgb - ${RGB_RESCALE_MODULE_NAME}.rescaleMin) / denominator, 0.0, 1.0);
+`,
+    },
+    getUniforms: (props) => ({
+      rescaleMin: props.rescaleMin,
+      rescaleMax: props.rescaleMax,
     }),
   };
 }
@@ -133,13 +192,13 @@ function createToneAdjustmentModule(adjustments: ToneAdjustment[]): RasterModule
 
   const props = summarizeAdjustments(adjustments);
   const module: ShaderModule<ToneModuleProps> = {
-    name: `tone-${props.gamma}-${props.saturation}-${props.sigmoidalContrast}-${props.sigmoidalBias}`,
-    fs: `uniform toneAdjustUniforms {
+    name: TONE_MODULE_NAME,
+    fs: `uniform ${TONE_MODULE_NAME}Uniforms {
   float gamma;
   float saturation;
   float sigmoidalContrast;
   float sigmoidalBias;
-} toneAdjust;
+} ${TONE_MODULE_NAME};
 `,
     uniformTypes: {
       gamma: "f32",
@@ -150,12 +209,12 @@ function createToneAdjustmentModule(adjustments: ToneAdjustment[]): RasterModule
     inject: {
       "fs:DECKGL_FILTER_COLOR": `
   vec3 adjusted = clamp(color.rgb, 0.0, 1.0);
-  adjusted = pow(adjusted, vec3(1.0 / max(toneAdjust.gamma, 0.0001)));
+  adjusted = pow(adjusted, vec3(1.0 / max(${TONE_MODULE_NAME}.gamma, 0.0001)));
   float luma = dot(adjusted, vec3(0.2126, 0.7152, 0.0722));
-  adjusted = clamp(vec3(luma) + (adjusted - vec3(luma)) * toneAdjust.saturation, 0.0, 1.0);
-  if (toneAdjust.sigmoidalContrast > 0.0) {
+  adjusted = clamp(vec3(luma) + (adjusted - vec3(luma)) * ${TONE_MODULE_NAME}.saturation, 0.0, 1.0);
+  if (${TONE_MODULE_NAME}.sigmoidalContrast > 0.0) {
     adjusted = clamp(
-      1.0 / (1.0 + exp(-toneAdjust.sigmoidalContrast * (adjusted - vec3(toneAdjust.sigmoidalBias)))),
+      1.0 / (1.0 + exp(-${TONE_MODULE_NAME}.sigmoidalContrast * (adjusted - vec3(${TONE_MODULE_NAME}.sigmoidalBias)))),
       0.0,
       1.0
     );
@@ -199,15 +258,15 @@ function getBandTextures(tile: GpuTileData): [Texture, Texture, Texture, Texture
   ];
 }
 
-function getSharedRgbRescaleRange(plan: Extract<CompiledRenderPlan, { kind: "rgb" }>): [number, number] | null {
-  const [first, ...rest] = plan.channels.map((channel) => channel.rescale);
-  if (!first) {
+function getRgbRescaleRanges(
+  plan: Extract<CompiledRenderPlan, { kind: "rgb" }>,
+): [[number, number], [number, number], [number, number]] | null {
+  const ranges = plan.channels.map((channel) => channel.rescale);
+  if (ranges.some((range) => !range)) {
     return null;
   }
 
-  return rest.every((range) => range && range[0] === first[0] && range[1] === first[1])
-    ? first
-    : null;
+  return ranges as [[number, number], [number, number], [number, number]];
 }
 
 export function renderTileWithGpuModules(
@@ -222,11 +281,11 @@ export function renderTileWithGpuModules(
     },
   ];
 
-  if (plan.kind === "scalar" && plan.alphaBand !== undefined) {
+  if (plan.alphaBand !== undefined) {
     const maskTexture = [band0, band1, band2, band3][plan.alphaBand - 1];
     if (maskTexture) {
       pipeline.push({
-        module: MaskTexture,
+        module: createPositiveMaskModule() as RasterModule["module"],
         props: { maskTexture },
       });
     }
@@ -276,16 +335,16 @@ export function renderTileWithGpuModules(
     return { renderPipeline: pipeline };
   }
 
-  const sharedRange = getSharedRgbRescaleRange(plan);
-  if (!sharedRange) {
-    throw new Error("GPU RGB rendering currently requires one shared rescale range across all channels.");
+  const ranges = getRgbRescaleRanges(plan);
+  if (!ranges) {
+    throw new Error("GPU RGB rendering requires explicit per-channel rescale ranges.");
   }
 
   pipeline.push({
-    module: LinearRescale,
+    module: createRgbRescaleModule() as RasterModule["module"],
     props: {
-      rescaleMin: sharedRange[0],
-      rescaleMax: sharedRange[1],
+      rescaleMin: [ranges[0][0], ranges[1][0], ranges[2][0]],
+      rescaleMax: [ranges[0][1], ranges[1][1], ranges[2][1]],
     },
   });
 
