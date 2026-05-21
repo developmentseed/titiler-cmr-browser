@@ -5,6 +5,12 @@ export type ZoomConstrainedLayer = {
   maxzoom?: number;
 };
 
+export type ProjectionTarget = {
+  getZoom: () => number;
+  getProjection: () => { type?: unknown } | null | undefined;
+  setProjection: (projection: { type: RasterProjection }) => void;
+};
+
 function isRenderableAtZoom(zoom: number, layer: ZoomConstrainedLayer): boolean {
   return zoom >= layer.minzoom && (layer.maxzoom === undefined || zoom < layer.maxzoom);
 }
@@ -21,4 +27,18 @@ export function getRasterProjection(
   return cmrLayerVisible && activeDeckLayers.some((layer) => isRenderableAtZoom(zoom, layer))
     ? "mercator"
     : "globe";
+}
+
+export function syncRasterProjection(
+  map: ProjectionTarget,
+  cmrLayerVisible: boolean,
+  activeDeckLayers: ZoomConstrainedLayer[],
+  onProjectionChange?: (type: RasterProjection) => void,
+): RasterProjection {
+  const type = getRasterProjection(cmrLayerVisible, map.getZoom(), activeDeckLayers);
+  if (map.getProjection()?.type !== type) {
+    map.setProjection({ type });
+    onProjectionChange?.(type);
+  }
+  return type;
 }

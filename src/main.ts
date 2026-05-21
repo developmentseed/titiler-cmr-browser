@@ -18,7 +18,7 @@ import { decodeState, encodeState, getRawDateFromDom } from "./url-state";
 import { exportMapImage } from "./export";
 import { deriveRasterState } from "./state";
 import { createDeckLayers } from "./deck-layers";
-import { getRasterProjection, type ZoomConstrainedLayer } from "./projection";
+import { syncRasterProjection, type ZoomConstrainedLayer } from "./projection";
 import { loadWebMercatorQuadDescriptor, type TileMatrixSetDescriptor } from "./titiler-cmr";
 
 initAbout();
@@ -62,10 +62,12 @@ function syncProjection(): void {
     return;
   }
 
-  const type = getRasterProjection(cmrLayerVisible, map.getZoom(), activeDeckLayerZoomRanges);
-  if (map.getProjection()?.type !== type) {
-    map.setProjection({ type });
-  }
+  syncRasterProjection(map, cmrLayerVisible, activeDeckLayerZoomRanges, () => {
+    // In interleaved mode deck only re-derives its MapView/GlobeView when
+    // setProps() runs, so a runtime globe↔mercator switch must resync the
+    // overlay immediately or raster layers stay stuck on the old view type.
+    deckOverlay.setProps({ layers: cmrLayerVisible ? activeDeckLayers : [] });
+  });
 }
 
 function setDeckLayers(layers: Layer[] = [], zoomRanges: ZoomConstrainedLayer[] = []): void {
