@@ -1,20 +1,11 @@
-import { TITILER_ENDPOINT } from "./config";
-import type { ControlState } from "./controls";
-
-type ColormapData = Record<string, [number, number, number, number]>;
-
-const cache = new Map<string, ColormapData>();
-
-async function fetchColormap(name: string): Promise<ColormapData> {
-  if (cache.has(name)) return cache.get(name)!;
-  const res = await fetch(`${TITILER_ENDPOINT}/colorMaps/${name}?f=json`);
-  const data: ColormapData = await res.json();
-  cache.set(name, data);
-  return data;
-}
+import { fetchColormap } from "./colormap";
+import type { LegendSpec } from "./state";
 
 /** Draws the colormap vertically: index 255 (max) at top, index 0 (min) at bottom. */
-function drawGradient(canvas: HTMLCanvasElement, data: ColormapData): void {
+function drawGradient(
+  canvas: HTMLCanvasElement,
+  data: Record<string, [number, number, number, number]>,
+): void {
   canvas.width = 1;
   canvas.height = 256;
   const ctx = canvas.getContext("2d")!;
@@ -25,22 +16,26 @@ function drawGradient(canvas: HTMLCanvasElement, data: ColormapData): void {
   }
 }
 
-/** Updates the #legend overlay to reflect the current render's colormap.
- *  Hidden when the render has no colormap_name or no rescale. */
-export function updateLegend(state: ControlState): void {
-  const el = document.getElementById("legend")!;
-  const { render } = state;
-  const colormapName = render.params.colormap_name;
-  const rescale = render.rescale;
+/** Updates the #legend overlay from derived client-side legend metadata. */
+let renderVersion = 0;
 
-  if (typeof colormapName !== "string" || !rescale || rescale.length === 0) {
+export function updateLegend(legend: LegendSpec): void {
+  const el = document.getElementById("legend")!;
+  const currentVersion = ++renderVersion;
+
+  if (legend.kind !== "colormap") {
+    el.innerHTML = "";
     el.classList.remove("visible");
     return;
   }
 
-  const [min, max] = rescale[0];
+  const [min, max] = legend.range;
 
-  fetchColormap(colormapName).then((data) => {
+  fetchColormap(legend.colormapName).then((data) => {
+    if (currentVersion !== renderVersion) {
+      return;
+    }
+
     el.innerHTML = "";
 
     const canvas = document.createElement("canvas");
@@ -57,10 +52,10 @@ export function updateLegend(state: ControlState): void {
 
     el.appendChild(gradient);
 
-    if (render.units) {
+    if (legend.units) {
       const units = document.createElement("div");
       units.className = "legend-units";
-      units.textContent = render.units;
+      units.textContent = legend.units;
       el.appendChild(units);
     }
 

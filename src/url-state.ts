@@ -23,6 +23,18 @@ export interface SerializedState {
 
 const RESERVED = new Set(["d", "c", "r", "dt", "s", "e", "dm", "lng", "lat", "z", "b", "pt"]);
 
+function parseOptionalNumber(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseRequiredNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /**
  * Encodes app state into the URL hash as URLSearchParams.
  * Uses replaceState to avoid polluting browser history.
@@ -65,12 +77,13 @@ export function decodeState(): SerializedState | null {
     const d = params.get("d");
     const c = params.get("c");
     const r = params.get("r");
-    const lngStr = params.get("lng");
-    const latStr = params.get("lat");
-    const zStr = params.get("z");
-    const bStr = params.get("b");
-    const ptStr = params.get("pt");
-    if (!d || !c || !r || !lngStr || !latStr || !zStr) return null;
+    const lng = parseRequiredNumber(params.get("lng"));
+    const lat = parseRequiredNumber(params.get("lat"));
+    const z = parseRequiredNumber(params.get("z"));
+    if (!d || !c || !r || lng === null || lat === null || z === null) return null;
+
+    const renderIdx = parseInt(r, 10);
+    if (!Number.isFinite(renderIdx)) return null;
 
     const extraParams: Record<string, string | string[]> = {};
     for (const [key, value] of params.entries()) {
@@ -88,16 +101,16 @@ export function decodeState(): SerializedState | null {
     return {
       d,
       c,
-      r: parseInt(r, 10),
+      r: renderIdx,
       dt: params.get("dt") ?? undefined,
       s: params.get("s") ?? undefined,
       e: params.get("e") ?? undefined,
       dm: params.get("dm") ?? undefined,
-      lng: parseFloat(lngStr),
-      lat: parseFloat(latStr),
-      z: parseFloat(zStr),
-      b: bStr ? parseFloat(bStr) : undefined,
-      pt: ptStr ? parseFloat(ptStr) : undefined,
+      lng,
+      lat,
+      z,
+      b: parseOptionalNumber(params.get("b")),
+      pt: parseOptionalNumber(params.get("pt")),
       p: Object.keys(extraParams).length > 0 ? extraParams : undefined,
     };
   } catch {

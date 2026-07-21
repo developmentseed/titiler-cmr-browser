@@ -100,6 +100,45 @@ function makeDateInput(id: string): HTMLInputElement {
   return el;
 }
 
+function applyInputDateBounds(
+  inputs: HTMLInputElement[],
+  range: { BeginningDateTime?: string; EndingDateTime?: string; EndsAtPresentFlag?: boolean } | undefined,
+  startSlice: number,
+  endSlice: number,
+): void {
+  if (range?.BeginningDateTime) {
+    const min = range.BeginningDateTime.slice(0, startSlice);
+    inputs.forEach((input) => {
+      input.min = min;
+    });
+  }
+
+  if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
+    const max = range.EndingDateTime.slice(0, endSlice);
+    inputs.forEach((input) => {
+      if (max < input.max) {
+        input.max = max;
+      }
+    });
+  }
+}
+
+function syncCollectionDateBounds(
+  collectionConceptId: string,
+  inputs: HTMLInputElement[],
+  startSlice: number,
+  endSlice = startSlice,
+): void {
+  void fetchMetadata(collectionConceptId).then((umm) => {
+    applyInputDateBounds(
+      inputs,
+      umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0],
+      startSlice,
+      endSlice,
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Date controls rendering
 // ---------------------------------------------------------------------------
@@ -139,14 +178,7 @@ function renderDateControls(
     container.appendChild(makeLabel("Date", "date-input"));
     container.appendChild(input);
     inputs = [input];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYMD = range.EndingDateTime.slice(0, 10);
-        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 10);
     return () => {
       const d = input.value || defaultVal;
       return `${d}T00:00:00Z/${d}T23:59:59Z`;
@@ -162,14 +194,7 @@ function renderDateControls(
     container.appendChild(makeLabel("Week of", "date-input"));
     container.appendChild(input);
     inputs = [input];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYMD = range.EndingDateTime.slice(0, 10);
-        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 10);
     return () => weekDatetimeRange(input.value || defaultVal);
   } else if (collection.date.mode === "month") {
     onModeChange?.("month");
@@ -184,14 +209,7 @@ function renderDateControls(
     container.appendChild(makeLabel("Month", "month-input"));
     container.appendChild(input);
     inputs = [input];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 7)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYM = range.EndingDateTime.slice(0, 7);
-        inputs.forEach((el) => { if (endYM < el.max) el.max = endYM; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 7);
     return () => monthToDatetimeRange(input.value || defaultMonth);
   } else if (collection.date.mode === "switchable") {
     // Render mode tabs then delegate to the appropriate sub-renderer.
@@ -287,14 +305,7 @@ function renderDateControls(
     container.appendChild(makeLabel("End Date", "end-date-input"));
     container.appendChild(endInput);
     inputs = [startInput, endInput];
-    fetchMetadata(collection.collectionConceptId).then((umm) => {
-      const range = umm?.TemporalExtents?.[0]?.RangeDateTimes?.[0];
-      if (range?.BeginningDateTime) inputs.forEach((el) => (el.min = range.BeginningDateTime!.slice(0, 10)));
-      if (range?.EndingDateTime && !range.EndsAtPresentFlag) {
-        const endYMD = range.EndingDateTime.slice(0, 10);
-        inputs.forEach((el) => { if (endYMD < el.max) el.max = endYMD; });
-      }
-    });
+    syncCollectionDateBounds(collection.collectionConceptId, inputs, 10);
     return () => {
       const s = startInput.value || defaultStart;
       const e = endInput.value || defaultEnd;
@@ -507,52 +518,90 @@ function renderExtraParams(
   };
 }
 
-function renderRgbExpressionControls(
+type RenderStyleControl = {
+  key: string;
+  label: string;
+  default: string;
+  options: { label: string; value: string }[];
+};
+
+function getRenderStyleControls(render: RenderConfig): {
+  title: string;
+  controls: RenderStyleControl[];
+} {
+  if (render.style.kind === "rgb") {
+    return {
+      title: "RGB Channels",
+      controls: (render.style.selectors ?? []).map((selector) => ({
+        key: selector.key,
+        label: `${selector.label} Channel`,
+        default: selector.default,
+        options: selector.options.map((option) => ({
+          label: option.label,
+          value: option.value,
+        })),
+      })),
+    };
+  }
+
+  if (render.style.colormapParamKey && render.style.colormapOptions?.length) {
+    return {
+      title: "Style",
+      controls: [
+        {
+          key: render.style.colormapParamKey,
+          label: "Colormap",
+          default: render.style.colormapName,
+          options: render.style.colormapOptions,
+        },
+      ],
+    };
+  }
+
+  return { title: "", controls: [] };
+}
+
+function renderStyleSelectorControls(
   container: HTMLElement,
   render: RenderConfig,
   onChange: () => void,
   initialValues?: Record<string, string | string[]>
 ): () => Record<string, string> {
+  const { title: groupTitle, controls } = getRenderStyleControls(render);
   container.innerHTML = "";
-  container.hidden = !render.rgbExpression;
-  if (!render.rgbExpression) return () => ({});
+  container.hidden = controls.length === 0;
+  if (controls.length === 0) return () => ({});
 
   const title = document.createElement("div");
   title.className = "rgb-controls-title";
-  title.textContent = "RGB Channels";
+  title.textContent = groupTitle;
   container.appendChild(title);
 
   const getters: Array<() => [string, string]> = [];
-  const channelDefs: Array<{ key: "rgb_r" | "rgb_g" | "rgb_b"; label: string }> = [
-    { key: "rgb_r", label: "Red" },
-    { key: "rgb_g", label: "Green" },
-    { key: "rgb_b", label: "Blue" },
-  ];
 
-  channelDefs.forEach(({ key, label }, idx) => {
-    const id = `rgb-${key}`;
+  controls.forEach((control) => {
+    const id = `selector-${control.key}`;
     const select = makeSelect(id);
 
-    for (const opt of render.rgbExpression!.options) {
+    for (const opt of control.options) {
       const el = document.createElement("option");
       el.value = opt.value;
       el.textContent = opt.label;
       select.appendChild(el);
     }
 
-    const stored = initialValues?.[key];
+    const stored = initialValues?.[control.key];
     const initial = Array.isArray(stored) ? stored[0] : stored;
-    const fallback = render.rgbExpression!.defaults[idx];
     const nextValue =
       initial !== undefined && Array.from(select.options).some((o) => o.value === initial)
         ? initial
-        : fallback;
+        : control.default;
     select.value = nextValue;
     select.addEventListener("change", onChange);
 
-    container.appendChild(makeLabel(`${label} Channel`, id));
+    container.appendChild(makeLabel(control.label, id));
     container.appendChild(select);
-    getters.push(() => [key, select.value]);
+    getters.push(() => [control.key, select.value]);
   });
 
   return () => Object.fromEntries(getters.map((g) => g()));
@@ -731,7 +780,7 @@ export function initControls(
   function onRenderChange(initialRenderParams?: Record<string, string | string[]>): void {
     const collection = getSelectedCollection(getSelectedDataset());
     const render = getSelectedRender(collection);
-    readRenderParams = renderRgbExpressionControls(
+    readRenderParams = renderStyleSelectorControls(
       renderOptions,
       render,
       () => onChange(getState()),

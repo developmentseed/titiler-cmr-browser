@@ -58,7 +58,7 @@ MapLibre parallel image request limits are bumped to 64 (`MAX_PARALLEL_IMAGE_REQ
 src/
   config.ts       # TITILER_ENDPOINT, type definitions, DATASETS array
   main.ts         # Map init, sky/globe setup, wires controls → layers → zoom-guard → loading
-  controls.ts     # Dataset/Collection/Render selects + date picker + extra params; exports getState()
+  controls.ts     # Dataset/Collection/Render selects + native date controls + extra params; exports getState()
   layers.ts       # updateLayer(): removes old CMR sources/layers, builds TileJSON URL, adds new raster source(s)
   loading.ts      # Shows #loading spinner on map `dataloading`, hides on `idle`
   zoom-guard.ts   # Shows #zoom-guard message when zoom < collection.minzoom
@@ -83,9 +83,11 @@ Describes one CMR collection. Key fields:
 
 ### `DateConfig`
 Controls how the date UI is rendered and how `datetime` is serialized:
-- `{ mode: "single"; default: string }` — one date input; datetime sent as a single-day range
-- `{ mode: "range"; default: [string, string] }` — two date inputs (start / end)
-- `{ mode: "month"; default: string }` — month/year picker; datetime sent as full calendar month range
+- `{ mode: "single"; default?: string }` — one date input; datetime sent as a single-day range
+- `{ mode: "range"; default?: [string, string] }` — two date inputs (start / end)
+- `{ mode: "month"; default?: string }` — month/year picker; datetime sent as the full calendar month range
+- `{ mode: "week"; default?: string }` — one date input; datetime sent as a 7-day range
+- `{ mode: "switchable"; defaultMode: "month" | "single" | "week" | "range"; default?: string | [string, string] }` — mode tabs above the native date controls
 
 ### `RenderConfig`
 One entry in `collection.renders`. Has `label`, optional `assets[]` (rasterio) or `variables[]` (xarray), `params` (arbitrary extra query params, values may be arrays for repeated params), and optional `subLayers`.
@@ -114,7 +116,7 @@ MapLibre fetches TileJSON natively when `type: 'raster'` with a `url` field is u
 
 Add a new `DatasetConfig` entry to the `DATASETS` array in `src/config.ts`. No other code changes are needed. Key decisions per collection:
 - `backend`: use `rasterio` for GeoTIFF/COG, `xarray` for NetCDF/HDF5
-- `date.mode`: `"month"` works well for high-revisit optical (HLS); `"range"` for SAR/sparse; `"single"` for daily products (SST)
+- `date.mode`: use `"month"` for high-revisit optical, `"range"` for sparse windows, `"single"` for daily products, or `"switchable"` when users need mode tabs
 - `queryParams`: add `cloud_cover` range for optical sensors, `attribute` filters for orbit direction etc.
 - `subLayers`: use when different zoom levels should hit different xarray groups (e.g. NISAR frequencyA vs frequencyB)
 - `assetsRegex`: use for rasterio collections where asset names follow a pattern (e.g. `"B[0-9][0-9]"` for HLS)

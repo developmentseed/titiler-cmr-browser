@@ -1,3 +1,5 @@
+import type { Layer } from "@deck.gl/core";
+import { MapboxOverlay } from "@deck.gl/mapbox";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -7,14 +9,17 @@ maplibregl.config.MAX_PARALLEL_IMAGE_REQUESTS = 64;
 maplibregl.config.MAX_PARALLEL_IMAGE_REQUESTS_PER_FRAME = 64;
 import "./style.css";
 import { initControls } from "./controls";
-import { updateLayer, setCmrLayersVisible } from "./layers";
 import { updateLegend } from "./legend";
-import { initLoading } from "./loading";
+import { createLoadingTracker, initLoading } from "./loading";
 import { initZoomGuard } from "./zoom-guard";
 import { initAbout } from "./about";
 import { initCollectionDetails } from "./collection-details";
 import { decodeState, encodeState, getRawDateFromDom } from "./url-state";
 import { exportMapImage } from "./export";
+import { deriveRasterState } from "./state";
+import { createDeckLayers } from "./deck-layers";
+import { syncRasterProjection, type ZoomConstrainedLayer } from "./projection";
+import { loadWebMercatorQuadDescriptor, type TileMatrixSetDescriptor } from "./titiler-cmr";
 
 initAbout();
 initCollectionDetails();
@@ -42,6 +47,36 @@ const map = new maplibregl.Map({
   canvasContextAttributes: { preserveDrawingBuffer: true },
 });
 
+const deckOverlay = new MapboxOverlay({
+  interleaved: true,
+  layers: [] as Layer[],
+});
+map.addControl(deckOverlay);
+
+const loadingTracker = createLoadingTracker();
+let activeDeckLayers: Layer[] = [];
+let activeDeckLayerZoomRanges: ZoomConstrainedLayer[] = [];
+
+function syncProjection(): void {
+  if (!mapReady) {
+    return;
+  }
+
+  syncRasterProjection(map, cmrLayerVisible, activeDeckLayerZoomRanges, () => {
+    // In interleaved mode deck only re-derives its MapView/GlobeView when
+    // setProps() runs, so a runtime globe↔mercator switch must resync the
+    // overlay immediately or raster layers stay stuck on the old view type.
+    deckOverlay.setProps({ layers: cmrLayerVisible ? activeDeckLayers : [] });
+  });
+}
+
+function setDeckLayers(layers: Layer[] = [], zoomRanges: ZoomConstrainedLayer[] = []): void {
+  activeDeckLayers = layers;
+  activeDeckLayerZoomRanges = zoomRanges;
+  deckOverlay.setProps({ layers: cmrLayerVisible ? activeDeckLayers : [] });
+  syncProjection();
+}
+
 map.addControl(new maplibregl.NavigationControl(), "bottom-right");
 const geolocate = new maplibregl.GeolocateControl({
   positionOptions: { enableHighAccuracy: true },
@@ -67,6 +102,7 @@ document.getElementById("export-btn")!.addEventListener("click", () => {
 
 let mapReady = false;
 let updateZoomGuard: (() => void) | null = null;
+let tilesetDescriptor: TileMatrixSetDescriptor | null = null;
 
 /** Writes current app + map state to the URL hash. */
 function updateUrl() {
@@ -97,6 +133,30 @@ let cmrLayerVisible = true;
 let labelsVisible = false;
 let labelLayerIds: string[] = [];
 
+function getLegendSpec() {
+  return deriveRasterState(getState()).layers[0]?.style.legend ?? { kind: "none" as const };
+}
+
+function refreshLayers(): void {
+  if (!mapReady) {
+    return;
+  }
+
+  const rasterState = deriveRasterState(getState());
+  if (!tilesetDescriptor) {
+    setDeckLayers([]);
+    return;
+  }
+
+  setDeckLayers(
+    createDeckLayers(rasterState, tilesetDescriptor, loadingTracker),
+    rasterState.layers.map((layer) => ({
+      minzoom: layer.minzoom,
+      maxzoom: layer.maxzoom,
+    })),
+  );
+}
+
 function setLabelsVisible(visible: boolean): void {
   for (const id of labelLayerIds) {
     map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
@@ -104,11 +164,10 @@ function setLabelsVisible(visible: boolean): void {
 }
 
 const { getState, getUrlMeta } = initControls(
-  (state) => {
+  () => {
     if (mapReady) {
-      updateLayer(map, state);
-      if (!cmrLayerVisible) setCmrLayersVisible(map, false);
-      updateLegend(state);
+      refreshLayers();
+      updateLegend(getLegendSpec());
       updateUrl();
       updateZoomGuard?.();
     }
@@ -149,7 +208,7 @@ controlsEl.appendChild(mapSection);
 layerToggle.addEventListener("click", () => {
   cmrLayerVisible = !cmrLayerVisible;
   layerToggle.classList.toggle("active", cmrLayerVisible);
-  setCmrLayersVisible(map, cmrLayerVisible);
+  setDeckLayers(activeDeckLayers, activeDeckLayerZoomRanges);
 });
 
 labelToggle.addEventListener("click", () => {
@@ -160,7 +219,7 @@ labelToggle.addEventListener("click", () => {
 
 map.on("load", () => {
   mapReady = true;
-  map.setProjection({ type: "globe" });
+  syncProjection();
   map.setSky({
     "sky-color": "#0d1117",
     "horizon-color": "#1a2233",
@@ -176,8 +235,8 @@ map.on("load", () => {
     .map((l) => l.id);
   setLabelsVisible(false);
 
-  initLoading(map, () => getState().collection.minzoom);
-  updateZoomGuard = initZoomGuard(map, () => getState().collection.minzoom);
+  initLoading(map, () => deriveRasterState(getState()).effectiveMinZoom, loadingTracker);
+  updateZoomGuard = initZoomGuard(map, () => deriveRasterState(getState()).effectiveMinZoom);
 
   if (initialUrlState?.lng !== undefined) {
     map.jumpTo({
@@ -188,11 +247,17 @@ map.on("load", () => {
     });
   }
 
-  updateLayer(map, getState());
-  if (!cmrLayerVisible) setCmrLayersVisible(map, false);
-  updateLegend(getState());
+  setDeckLayers();
+  refreshLayers();
+  void loadWebMercatorQuadDescriptor().then((descriptor) => {
+    tilesetDescriptor = descriptor;
+    refreshLayers();
+  });
+  updateLegend(getLegendSpec());
   updateUrl();
 });
+
+map.on("zoom", syncProjection);
 
 map.on("moveend", () => {
   if (mapReady) updateUrl();
