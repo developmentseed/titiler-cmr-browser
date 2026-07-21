@@ -122,5 +122,5 @@ Add a new `DatasetConfig` entry to the `DATASETS` array in `src/config.ts`. No o
 ## Existing Datasets
 
 - **HLS** (`C2021957657-LPCLOUD` / `C2021957295-LPCLOUD`) — Harmonized Landsat/Sentinel-2, rasterio, minzoom 5, True Color + False Color renders, cloud cover filter
-- **NISAR Beta GCOV** (`C3622214170-ASF`) — xarray, minzoom 6, HHHH/HVHV RGB render with frequencyA/B sub-layers, orbit direction attribute filter
+- **NISAR Provisional GCOV** (`C2854338529-ASF`) — xarray, minzoom 6, HHHH/HVHV RGB render with frequencyA/B sub-layers, orbit direction attribute filter
 - **MUR SST** (`C1996881146-POCLOUD`) — xarray, minzoom 0, SST + sea ice fraction renders

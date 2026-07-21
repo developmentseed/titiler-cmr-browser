@@ -17,7 +17,7 @@ A minimal map application showcasing [titiler-cmr](https://developmentseed.org/t
 | Dataset | Collections | Backend |
 |---|---|---|
 | HLS (Harmonized Landsat Sentinel-2) | HLSL30 (Landsat 8/9), HLSS30 (Sentinel-2) | rasterio |
-| NISAR Beta GCOV | NISAR L2 GCOV with balanced, vegetation, urban, water-emphasis, and custom RGB SAR renders | xarray |
+| NISAR Provisional GCOV | NISAR L2 GCOV with balanced, vegetation, urban, water-emphasis, and custom RGB SAR renders | xarray |
 | MUR Sea Surface Temperature | MUR SST | xarray |
 
 ## Development

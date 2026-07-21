@@ -203,7 +203,8 @@ export const DATASETS: DatasetConfig[] = [
         backend: "rasterio",
         minzoom: 5,
         maxzoom: 13,
-        attribution: '<a href="https://lpdaac.usgs.gov/products/hlss30v002/" target="_blank">HLS Sentinel-2 (NASA LP DAAC / ESA)</a>',
+        attribution:
+          '<a href="https://lpdaac.usgs.gov/products/hlss30v002/" target="_blank">HLS Sentinel-2 (NASA LP DAAC / ESA)</a>',
         date: { mode: "switchable", defaultMode: "month" },
         queryParams: [
           {
@@ -221,8 +222,8 @@ export const DATASETS: DatasetConfig[] = [
             key: "sort_key",
             options: [
               { label: "Least cloudy", value: "cloud_cover" },
-              { label: "Most recent",  value: "-start_date" },
-              { label: "Oldest",       value: "start_date"  },
+              { label: "Most recent", value: "-start_date" },
+              { label: "Oldest", value: "start_date" },
             ],
             default: "cloud_cover",
           },
@@ -256,7 +257,8 @@ export const DATASETS: DatasetConfig[] = [
         minzoom: 5,
         maxzoom: 13,
         backend: "rasterio",
-        attribution: '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
+        attribution:
+          '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
         date: { mode: "switchable", defaultMode: "month" },
         queryParams: [
           {
@@ -274,8 +276,8 @@ export const DATASETS: DatasetConfig[] = [
             key: "sort_key",
             options: [
               { label: "Least cloudy", value: "cloud_cover" },
-              { label: "Most recent",  value: "-start_date" },
-              { label: "Oldest",       value: "start_date"  },
+              { label: "Most recent", value: "-start_date" },
+              { label: "Oldest", value: "start_date" },
             ],
             default: "cloud_cover",
           },
@@ -305,15 +307,20 @@ export const DATASETS: DatasetConfig[] = [
   },
   {
     id: "nisar-gcov",
-    label: "NISAR Beta GCOV",
+    label: "NISAR Provisional GCOV",
     collection: {
-      label: "NISAR L2 GCOV",
-      collectionConceptId: "C3622214170-ASF",
+      label: "NISAR Provisional L2 GCOV",
+      collectionConceptId: "C2854338529-ASF",
       backend: "xarray",
       minzoom: 6,
       maxzoom: 13,
-      attribution: '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ISRO / ASF DAAC)</a>',
-      date: { mode: "switchable", defaultMode: "range", default: ["2026-01-01", "2026-04-01"] },
+      attribution:
+        '<a href="https://nisar.jpl.nasa.gov/" target="_blank">NISAR GCOV (NASA JPL / ISRO / ASF DAAC)</a>',
+      date: {
+        mode: "switchable",
+        defaultMode: "range",
+        default: ["2026-07-01", "2026-08-01"],
+      },
       queryParams: [
         {
           type: "attribute",
@@ -336,7 +343,11 @@ export const DATASETS: DatasetConfig[] = [
             ...NISAR_GCOV_COMMON_PARAMS,
             expression: "10 * log10(b1); 10 * log10(b2); 10 * log10(b1/b2)",
           },
-          rescale: [[-20, 0], [-30, 5], [2, 18]],
+          rescale: [
+            [-20, 0],
+            [-30, 5],
+            [2, 18],
+          ],
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
@@ -346,7 +357,11 @@ export const DATASETS: DatasetConfig[] = [
             ...NISAR_GCOV_COMMON_PARAMS,
             expression: "10 * log10(b2); 10 * log10(b1); 10 * log10(b1/b2)",
           },
-          rescale: [[-30, 5], [-20, 0], [2, 18]],
+          rescale: [
+            [-30, 5],
+            [-20, 0],
+            [2, 18],
+          ],
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
@@ -356,7 +371,11 @@ export const DATASETS: DatasetConfig[] = [
             ...NISAR_GCOV_COMMON_PARAMS,
             expression: "10 * log10(b1/b2); 10 * log10(b1); 10 * log10(b2)",
           },
-          rescale: [[2, 18], [-20, 0], [-30, 5]],
+          rescale: [
+            [2, 18],
+            [-20, 0],
+            [-30, 5],
+          ],
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
@@ -366,7 +385,11 @@ export const DATASETS: DatasetConfig[] = [
             ...NISAR_GCOV_COMMON_PARAMS,
             expression: "10 * log10(b2); 10 * log10(b1/b2); 10 * log10(b1)",
           },
-          rescale: [[-30, 5], [2, 18], [-20, 0]],
+          rescale: [
+            [-30, 5],
+            [2, 18],
+            [-20, 0],
+          ],
           subLayers: NISAR_GCOV_SUBLAYERS,
         },
         {
@@ -391,7 +414,8 @@ export const DATASETS: DatasetConfig[] = [
       backend: "xarray",
       minzoom: 0,
       maxzoom: 13,
-      attribution: '<a href="https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1" target="_blank">MUR SST (NASA JPL PO.DAAC)</a>',
+      attribution:
+        '<a href="https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1" target="_blank">MUR SST (NASA JPL PO.DAAC)</a>',
       date: { mode: "single" },
       renders: [
         {
