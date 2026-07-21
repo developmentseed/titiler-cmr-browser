@@ -5,7 +5,6 @@ import {
 } from "@developmentseed/deck.gl-raster";
 import type { Layer } from "@deck.gl/core";
 import { createBandTileCache, type BandTileCache } from "./band-cache";
-import { getColormapLut } from "./colormap";
 import {
   destroyGpuTileResources,
   getColormapTexture,
@@ -44,9 +43,6 @@ export function createDeckLayer(
   bandCache: BandTileCache = sharedBandCache,
 ): Layer {
   const compiled = compileRenderPlan(layer.style);
-  const cpuColormapLutPromise =
-    compiled.kind === "scalar" ? getColormapLut(compiled.colormapName) : undefined;
-
   const props: RasterTileLayerProps<MaybeDecodedTileData> = {
     id: getDeckLayerId(layer, index),
     minZoom: layer.minzoom,
@@ -58,12 +54,7 @@ export function createDeckLayer(
     getTileData: async (tile, options: GetTileDataOptions) => {
       const data = await getTileData(tile, options, layer.source, tracker, bandCache);
       if (data && compiled.kind === "scalar") {
-        const [colormapTexture, cpuColormapLut] = await Promise.all([
-          getColormapTexture(options.device),
-          cpuColormapLutPromise,
-        ]);
-        data.colormapTexture = colormapTexture;
-        data.cpuColormapLut = cpuColormapLut;
+        data.colormapTexture = await getColormapTexture(options.device);
       }
       return data;
     },
@@ -71,11 +62,7 @@ export function createDeckLayer(
       if (!data) {
         return null;
       }
-      try {
-        return renderTileWithGpuModules(data, compiled);
-      } catch {
-        return { image: compiled.renderTile(data) };
-      }
+      return renderTileWithGpuModules(data, compiled);
     },
     updateTriggers: {
       renderTile: [compiled.styleKey],

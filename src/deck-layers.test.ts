@@ -5,7 +5,6 @@ import { DATASETS } from "./config";
 import type { CollectionConfig, DatasetConfig, RenderConfig } from "./config";
 import type { ControlState } from "./controls";
 import { createDeckLayers } from "./deck-layers";
-import * as gpuRender from "./gpu-render";
 import { deriveRasterState } from "./state";
 
 class TestImageData {
@@ -137,52 +136,6 @@ describe("createDeckLayers", () => {
     expect(baseLayers[0].props.updateTriggers.renderTile).not.toEqual(
       variantLayers[0].props.updateTriggers.renderTile,
     );
-  });
-
-  it("falls back to scalar CPU rendering with the configured colormap when GPU rendering fails", () => {
-    vi.spyOn(gpuRender, "renderTileWithGpuModules").mockImplementation(() => {
-      throw new Error("gpu failed");
-    });
-
-    const [layer] = createDeckLayers(
-      deriveRasterState(
-        makeState({
-          datasetId: "mur-sst",
-          renderLabel: "Sea Surface Temperature",
-          datetime: "2026-05-19T00:00:00Z/2026-05-19T23:59:59Z",
-        }),
-      ),
-      descriptorStub,
-    ) as unknown as LayerWithProps[];
-
-    const rendered = layer.props.renderTile({
-      device: {} as never,
-      width: 1,
-      height: 1,
-      byteLength: 4,
-      bandTextures: [],
-      cpuColormapLut: (() => {
-        const lut = new Uint8ClampedArray(256 * 4);
-        const offset = 16 * 4;
-        lut[offset] = 12;
-        lut[offset + 1] = 34;
-        lut[offset + 2] = 56;
-        lut[offset + 3] = 255;
-        return lut;
-      })(),
-      ndarray: {
-        data: new Float32Array([273.15]),
-        dtype: "f4",
-        shape: [1, 1],
-        fortranOrder: false,
-        width: 1,
-        height: 1,
-        bandCount: 1,
-        byteLength: 4,
-      },
-    }) as { image: ImageData };
-
-    expect(Array.from(rendered.image.data)).toEqual([12, 34, 56, 255]);
   });
 
   it("reuses overlapping cached bands across HLS render changes and fetches only the missing band", async () => {

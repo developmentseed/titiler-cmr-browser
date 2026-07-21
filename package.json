@@ -13,10 +13,7 @@
   },
   "dependencies": {
     "@deck.gl/core": "^9.3.2",
-    "@deck.gl/geo-layers": "^9.3.2",
-    "@deck.gl/layers": "^9.3.2",
     "@deck.gl/mapbox": "^9.3.2",
-    "@deck.gl/mesh-layers": "^9.3.2",
     "@developmentseed/deck.gl-raster": "^0.7.0",
     "@developmentseed/morecantile": "^0.7.0",
     "@luma.gl/core": "^9.3.3",
@@ -25,7 +22,6 @@
     "npyjs": "^1.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
     "gh-pages": "^6.3.0",
     "jsdom": "^29.1.1",
     "typescript": "^5.7.2",

@@ -57,7 +57,7 @@ function makeState(args: {
 }
 
 describe("deriveRasterState", () => {
-  it("derives HLS true-color source fetch data and RGB style adjustments", () => {
+  it("derives HLS true-color source fetch data and RGB style", () => {
     const state = makeState({
       datasetId: "hls",
       collectionLabelIncludes: "Sentinel-2",
@@ -88,11 +88,6 @@ describe("deriveRasterState", () => {
       { op: "band", band: 1 },
       { op: "band", band: 2 },
       { op: "band", band: 3 },
-    ]);
-    expect(style.adjustments).toEqual([
-      { kind: "gamma", value: 3.5 },
-      { kind: "saturation", value: 1.2 },
-      { kind: "sigmoidal", contrast: 15, bias: 0.35 },
     ]);
   });
 

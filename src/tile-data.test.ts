@@ -4,7 +4,6 @@ import {
   assembleBandTiles,
   decodeNpyTile,
   getTileShape,
-  toGpuUploadArray,
 } from "./tile-data";
 
 describe("tile-data", () => {
@@ -86,23 +85,6 @@ describe("tile-data", () => {
     expect(assembled.dtype).toBe("f4");
     expect(assembled.data).toBeInstanceOf(Float32Array);
     expect(Array.from(assembled.data)).toEqual([1, 2, 3, 4, 1.5, 2.5, 3.5, 4.5]);
-  });
-
-  it("widens uint16/int16/float64 tiles to float32 for GPU upload", async () => {
-    const uint16Tile = await decodeNpyTile(dump([0, 1, 65535, 42], [2, 2], { dtype: "u2" }));
-    const int16Tile = await decodeNpyTile(dump([-10, 0, 10, 20], [2, 2], { dtype: "i2" }));
-    const float64Tile = await decodeNpyTile(dump([1.25, 2.5, 3.75, 5], [2, 2], { dtype: "f8" }));
-
-    const uint16Upload = toGpuUploadArray(uint16Tile);
-    const int16Upload = toGpuUploadArray(int16Tile);
-    const float64Upload = toGpuUploadArray(float64Tile);
-
-    expect(uint16Upload).toBeInstanceOf(Float32Array);
-    expect(int16Upload).toBeInstanceOf(Float32Array);
-    expect(float64Upload).toBeInstanceOf(Float32Array);
-    expect(Array.from(uint16Upload)).toEqual([0, 1, 65535, 42]);
-    expect(Array.from(int16Upload)).toEqual([-10, 0, 10, 20]);
-    expect(Array.from(float64Upload)).toEqual([1.25, 2.5, 3.75, 5]);
   });
 
   it("rejects incompatible shapes during assembly", async () => {

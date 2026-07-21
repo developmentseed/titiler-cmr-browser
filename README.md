@@ -8,7 +8,7 @@ A minimal map application showcasing [titiler-cmr](https://developmentseed.org/t
 - Tile loading indicator (tile fetches from titiler-cmr can be slow)
 - Per-layer minimum zoom enforcement with a visual prompt to zoom in
 - Dataset / collection / render switching with live tile updates
-- Date and date-range pickers
+- Native single-day, week, month, and custom date-range controls
 - Advanced query parameter controls (cloud cover, orbit direction, etc.)
 - Mobile-friendly collapsible controls panel
 
@@ -38,7 +38,7 @@ Single-page static site — no server-side code.
 ```
 src/
   config.ts       # TITILER_ENDPOINT, type definitions, DATASETS array, typed fetch/style render metadata
-  controls.ts     # Dataset/collection/render selects, date picker, extra params
+  controls.ts     # Dataset/collection/render selects, date controls, extra params
   main.ts         # Map init; owns the MapLibre shell and the interleaved deck.gl overlay
   state.ts        # Derives sourceKey, styleKey, and per-band request specs
   band-cache.ts   # Memory-first raw band cache keyed by bandRequestKey + z/x/y
@@ -69,7 +69,7 @@ Each `CollectionConfig` requires:
 | `collectionConceptId` | NASA CMR collection concept ID |
 | `backend` | `rasterio` (GeoTIFF/COG) or `xarray` (NetCDF/HDF5) |
 | `minzoom` / `maxzoom` | Zoom range for tile requests |
-| `date` | `{ mode: "single", default: "YYYY-MM-DD" }` or `{ mode: "range", default: ["YYYY-MM-DD", "YYYY-MM-DD"] }` |
+| `date` | Date UI mode and optional defaults, e.g. `{ mode: "single", default: "YYYY-MM-DD" }` or `{ mode: "range", default: ["YYYY-MM-DD", "YYYY-MM-DD"] }` |
 | `renders` | Array of `RenderConfig` objects (label, assets/variables, query params) |
 | `queryParams` | Optional extra controls: `range`, `select`, `text`, or `attribute` |
 
@@ -84,4 +84,4 @@ A dataset with a single collection hides the collection selector in the UI. A da
 3. `src/deck-layers.ts` builds `RasterTileLayer` instances keyed by `sourceKey`, with rerender invalidation driven by `styleKey`.
 4. `src/band-cache.ts` reuses raw band tiles by `bandRequestKey + z/x/y`, so overlapping render changes only fetch missing bands.
 5. `src/titiler-cmr.ts` fetches raw `.npy` tiles from `/{backend}/tiles/WebMercatorQuad/{z}/{x}/{y}.npy` using only source-affecting params, then assembles the requested multi-band tile locally.
-6. `src/render-plan.ts` and the GPU/CPU render path apply client-side expressions, rescale, RGB composition, and colormaps without asking the server to restyle the tile.
+6. `src/render-plan.ts` and the GPU render path apply client-side expressions, rescale, RGB composition, and colormaps without asking the server to restyle the tile.

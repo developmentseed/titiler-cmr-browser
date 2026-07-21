@@ -29,7 +29,7 @@ export type TileIndexLike = {
 
 export type RequestTracker = {
   start?: () => void;
-  finish?: (status: "ok" | "aborted" | "error") => void;
+  finish?: () => void;
 };
 
 export type GpuTileData = {
@@ -40,7 +40,6 @@ export type GpuTileData = {
   byteLength: number;
   bandTextures: Texture[];
   colormapTexture?: Texture;
-  cpuColormapLut?: Uint8ClampedArray;
 };
 
 export type DecodedTileData = GpuTileData;
@@ -147,7 +146,6 @@ async function fetchBandTile(
   try {
     const response = await fetch(url, { signal: options.signal });
     if (response.status === 204) {
-      tracker?.finish?.("ok");
       return { ndarray: null };
     }
     if (!response.ok) {
@@ -156,21 +154,13 @@ async function fetchBandTile(
 
     const buffer = await response.arrayBuffer();
     if (buffer.byteLength === 0) {
-      tracker?.finish?.("ok");
       return { ndarray: null };
     }
 
     const ndarray = await decodeNpyTile(buffer);
-    tracker?.finish?.("ok");
     return { ndarray };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      tracker?.finish?.("aborted");
-      throw error;
-    }
-
-    tracker?.finish?.("error");
-    throw error;
+  } finally {
+    tracker?.finish?.();
   }
 }
 

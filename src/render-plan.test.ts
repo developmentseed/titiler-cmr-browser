@@ -4,18 +4,6 @@ import type { CollectionConfig, DatasetConfig, RenderConfig } from "./config";
 import type { ControlState } from "./controls";
 import { compileRenderPlan } from "./render-plan";
 import { deriveClientRenderPlan } from "./state";
-import type { DecodedTileData } from "./titiler-cmr";
-
-class TestImageData {
-  constructor(
-    readonly data: Uint8ClampedArray,
-    readonly width: number,
-    readonly height: number,
-  ) {}
-}
-
-globalThis.ImageData ??= TestImageData as typeof ImageData;
-
 function getDataset(id: string): DatasetConfig {
   const dataset = DATASETS.find((item) => item.id === id);
   if (!dataset) {
@@ -55,46 +43,8 @@ function makeState(args: {
   };
 }
 
-function makeMaskedHlsTile(): DecodedTileData {
-  return {
-    device: {} as never,
-    width: 2,
-    height: 1,
-    byteLength: 16,
-    bandTextures: [],
-    ndarray: {
-      data: new Int16Array([
-        1000, 2000,
-        1000, 2000,
-        1000, 2000,
-        32767, -32768,
-      ]),
-      dtype: "i2",
-      shape: [4, 1, 2],
-      fortranOrder: false,
-      width: 2,
-      height: 1,
-      bandCount: 4,
-      byteLength: 16,
-    },
-  };
-}
-
-function makeColormapLut(entries: Record<number, [number, number, number, number]>): Uint8ClampedArray {
-  const lut = new Uint8ClampedArray(256 * 4);
-  for (const [indexText, rgba] of Object.entries(entries)) {
-    const index = Number(indexText);
-    const offset = index * 4;
-    lut[offset] = rgba[0];
-    lut[offset + 1] = rgba[1];
-    lut[offset + 2] = rgba[2];
-    lut[offset + 3] = rgba[3];
-  }
-  return lut;
-}
-
 describe("compileRenderPlan", () => {
-  it("compiles scalar styles into expression -> rescale -> colormap steps", () => {
+  it("compiles scalar styles", () => {
     const state = makeState({
       datasetId: "mur-sst",
       renderLabel: "Sea Surface Temperature",
@@ -108,20 +58,15 @@ describe("compileRenderPlan", () => {
       throw new Error("Expected scalar render plan");
     }
 
-    expect(compiled.steps).toEqual([
-      {
-        kind: "expression",
-        expression: {
-          op: "sub",
-          args: [
-            { op: "band", band: 1 },
-            { op: "const", value: 273.15 },
-          ],
-        },
-      },
-      { kind: "linear-rescale", range: [-2, 29] },
-      { kind: "colormap", colormapName: "nipy_spectral" },
-    ]);
+    expect(compiled.expression).toEqual({
+      op: "sub",
+      args: [
+        { op: "band", band: 1 },
+        { op: "const", value: 273.15 },
+      ],
+    });
+    expect(compiled.rescale).toEqual([-2, 29]);
+    expect(compiled.colormapName).toBe("nipy_spectral");
     expect(compiled.nodata).toBe(-273.15);
   });
 
@@ -207,104 +152,11 @@ describe("compileRenderPlan", () => {
       [0, 32767],
     ]);
     expect(compiled.alphaBand).toBe(4);
-  });
-
-  it("uses the HLS mask band as alpha in CPU rendering", () => {
-    const state = makeState({
-      datasetId: "hls",
-      renderLabel: "True Color",
-      datetime: "2026-04-01T00:00:00Z/2026-04-30T23:59:59Z",
-    });
-
-    const compiled = compileRenderPlan(deriveClientRenderPlan(state));
-
-    expect(compiled.kind).toBe("rgb");
-    if (compiled.kind !== "rgb") {
-      throw new Error("Expected rgb render plan");
-    }
-
-    const image = compiled.renderTile(makeMaskedHlsTile());
-
-    expect(Array.from(image.data)).toEqual([
-      145, 145, 145, 255,
-      0, 0, 0, 0,
+    expect(compiled.adjustments).toEqual([
+      { kind: "gamma", value: 3.5 },
+      { kind: "saturation", value: 1.2 },
+      { kind: "sigmoidal", contrast: 15, bias: 0.35 },
     ]);
-  });
-
-  it("renders scalar fallback pixels with the configured colormap instead of grayscale", () => {
-    const state = makeState({
-      datasetId: "mur-sst",
-      renderLabel: "Sea Surface Temperature",
-      datetime: "2026-05-19T00:00:00Z/2026-05-19T23:59:59Z",
-    });
-
-    const compiled = compileRenderPlan(deriveClientRenderPlan(state));
-
-    expect(compiled.kind).toBe("scalar");
-    if (compiled.kind !== "scalar") {
-      throw new Error("Expected scalar render plan");
-    }
-
-    const image = compiled.renderTile({
-      device: {} as never,
-      width: 2,
-      height: 1,
-      byteLength: 8,
-      bandTextures: [],
-      cpuColormapLut: makeColormapLut({
-        16: [12, 34, 56, 255],
-      }),
-      ndarray: {
-        data: new Float32Array([273.15, 0]),
-        dtype: "f4",
-        shape: [1, 2],
-        fortranOrder: false,
-        width: 2,
-        height: 1,
-        bandCount: 1,
-        byteLength: 8,
-      },
-    });
-
-    expect(Array.from(image.data)).toEqual([
-      12, 34, 56, 255,
-      0, 0, 0, 0,
-    ]);
-  });
-
-  it("fails explicitly when scalar CPU fallback lacks the configured colormap", () => {
-    const state = makeState({
-      datasetId: "mur-sst",
-      renderLabel: "Sea Surface Temperature",
-      datetime: "2026-05-19T00:00:00Z/2026-05-19T23:59:59Z",
-    });
-
-    const compiled = compileRenderPlan(deriveClientRenderPlan(state));
-
-    expect(compiled.kind).toBe("scalar");
-    if (compiled.kind !== "scalar") {
-      throw new Error("Expected scalar render plan");
-    }
-
-    expect(() =>
-      compiled.renderTile({
-        device: {} as never,
-        width: 1,
-        height: 1,
-        byteLength: 4,
-        bandTextures: [],
-        ndarray: {
-          data: new Float32Array([273.15]),
-          dtype: "f4",
-          shape: [1, 1],
-          fortranOrder: false,
-          width: 1,
-          height: 1,
-          bandCount: 1,
-          byteLength: 4,
-        },
-      }),
-    ).toThrow(/colormap lookup table/);
   });
 
   it("uses fixed rescale ranges for preset NISAR RGB renders so tiles share one scale", () => {

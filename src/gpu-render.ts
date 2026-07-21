@@ -85,7 +85,7 @@ function createExpressionModule(plan: CompiledRenderPlan): ShaderModule<ExprModu
   const expressionBody =
     plan.kind === "scalar"
       ? `
-  float scalar = ${compileExpressionGlsl(plan.steps[0].kind === "expression" ? plan.steps[0].expression : { op: "const", value: 0 })};
+  float scalar = ${compileExpressionGlsl(plan.expression)};
   if (isnan(scalar) || isinf(scalar)) {
     color = vec4(0.0, 0.0, 0.0, 0.0);
     return;
@@ -239,7 +239,11 @@ export async function getColormapTexture(device: Device): Promise<Texture> {
         return response.arrayBuffer();
       })
       .then((buffer) => decodeColormapSprite(buffer))
-      .then((imageData) => createColormapTexture(device, imageData));
+      .then((imageData) => createColormapTexture(device, imageData))
+      .catch((error: unknown) => {
+        colormapTextureCache.delete(device);
+        throw error;
+      });
     colormapTextureCache.set(device, pending);
   }
   return pending;
@@ -292,13 +296,8 @@ export function renderTileWithGpuModules(
   }
 
   if (plan.kind === "scalar") {
-    const rescaleStep = plan.steps[1];
-    const colormapStep = plan.steps[2];
-    if (rescaleStep.kind !== "linear-rescale" || colormapStep.kind !== "colormap") {
-      throw new Error("Unexpected scalar render plan step ordering.");
-    }
-    const [min, max] = rescaleStep.range;
-    const colormapName = colormapStep.colormapName;
+    const [min, max] = plan.rescale;
+    const colormapName = plan.colormapName;
     const reversed = colormapName.endsWith("_r");
     const baseName = reversed ? colormapName.slice(0, -2) : colormapName;
     const colormapIndex = COLORMAP_INDEX[baseName as keyof typeof COLORMAP_INDEX];

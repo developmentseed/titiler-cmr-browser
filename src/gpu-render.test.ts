@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DATASETS } from "./config";
-import type { CollectionConfig, DatasetConfig, RenderConfig } from "./config";
+import type { CollectionConfig, DatasetConfig, RenderConfig, ScalarStyleConfig } from "./config";
 import type { ControlState } from "./controls";
 import { renderTileWithGpuModules } from "./gpu-render";
 import { compileRenderPlan } from "./render-plan";
@@ -57,7 +57,6 @@ function makeTile(bandCount = 1): GpuTileData {
       data: new Float32Array(4 * bandCount).fill(1),
       dtype: "f4",
       shape: bandCount === 1 ? [2, 2] : [bandCount, 2, 2],
-      fortranOrder: false,
       width: 2,
       height: 2,
       bandCount,
@@ -136,6 +135,42 @@ describe("renderTileWithGpuModules", () => {
     });
   });
 
+  it("supports every configured scalar colormap on the GPU path", () => {
+    const scalarStyles = DATASETS.flatMap((dataset) =>
+      getCollections(dataset).flatMap((collection) =>
+        collection.renders
+          .map((render) => render.style)
+          .filter((style): style is ScalarStyleConfig => style.kind === "scalar"),
+      ),
+    );
+
+    for (const style of scalarStyles) {
+      const names = [
+        style.colormapName,
+        ...(style.colormapOptions?.map((option) => option.value) ?? []),
+      ];
+      for (const name of names) {
+        expect(() =>
+          renderTileWithGpuModules(
+            { ...makeTile(), colormapTexture: { destroy() {} } as never },
+            compileRenderPlan({
+              kind: "scalar",
+              selectorValues: {},
+              styleKey: name,
+              expression: style.expression,
+              rescale: style.rescale,
+              colormapName: name,
+              nodata: style.nodata,
+              alphaBand: style.alphaBand,
+              units: style.units,
+              legend: { kind: "none" },
+            }),
+          ),
+        ).not.toThrow();
+      }
+    }
+  });
+
   it("uses positive alpha-mask filtering for RGB plans with an alpha band", () => {
     const compiled = compileRenderPlan(
       deriveClientRenderPlan(
@@ -154,7 +189,7 @@ describe("renderTileWithGpuModules", () => {
     expect(filterCode).toMatch(/maskValue > 0\.0/);
   });
 
-  it("normalizes sigmoidal tone adjustment the same way as the CPU renderer", () => {
+  it("keeps HLS tone adjustments on the GPU path", () => {
     const compiled = compileRenderPlan(
       deriveClientRenderPlan(
         makeState({
@@ -169,9 +204,8 @@ describe("renderTileWithGpuModules", () => {
     const { renderPipeline } = renderTileWithGpuModules(makeTile(4), compiled);
     const toneModule = renderPipeline[renderPipeline.length - 1]?.module;
     const filterCode = toneModule?.inject?.["fs:DECKGL_FILTER_COLOR"] ?? "";
+    expect(filterCode).toMatch(/toneAdjust/);
     expect(filterCode).toMatch(/vec3 low/);
-    expect(filterCode).toMatch(/vec3 high/);
     expect(filterCode).toMatch(/numerator \/ denominator/);
-    expect(filterCode).toMatch(/abs\(toneAdjust\.sigmoidalContrast\) > 0\.000001/);
   });
 });

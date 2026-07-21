@@ -5,10 +5,7 @@ export type CachedBandTile = {
 };
 
 export type BandTileCache = {
-  get: (key: string) => CachedBandTile | undefined;
-  set: (key: string, value: CachedBandTile) => void;
   getOrLoad: (key: string, loader: () => Promise<CachedBandTile>) => Promise<CachedBandTile>;
-  clear: () => void;
 };
 
 /**
@@ -20,12 +17,6 @@ export function createBandTileCache(): BandTileCache {
   const inFlight = new Map<string, Promise<CachedBandTile>>();
 
   return {
-    get(key) {
-      return settled.get(key);
-    },
-    set(key, value) {
-      settled.set(key, value);
-    },
     getOrLoad(key, loader) {
       const cached = settled.get(key);
       if (cached) {
@@ -50,10 +41,6 @@ export function createBandTileCache(): BandTileCache {
 
       inFlight.set(key, loadPromise);
       return loadPromise;
-    },
-    clear() {
-      settled.clear();
-      inFlight.clear();
     },
   };
 }

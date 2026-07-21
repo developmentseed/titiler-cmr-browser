@@ -290,151 +290,118 @@ const HLS_FALSE_COLOR_ADJUSTMENTS: ToneAdjustment[] = [
   { kind: "sigmoidal", contrast: 10, bias: 0.35 },
 ];
 
+const HLS_QUERY_PARAMS: QueryParamConfig[] = [
+  {
+    type: "range",
+    label: "Cloud Cover (%)",
+    key: "cloud_cover",
+    min: 0,
+    max: 100,
+    step: 1,
+    default: [0, 100],
+  },
+  {
+    type: "select",
+    label: "Sort by",
+    key: "sort_key",
+    options: [
+      { label: "Least cloudy", value: "cloud_cover" },
+      { label: "Most recent", value: "-start_date" },
+      { label: "Oldest", value: "start_date" },
+    ],
+    default: "cloud_cover",
+  },
+];
+
+function hlsRender(
+  label: string,
+  assets: [string, string, string],
+  adjustments: ToneAdjustment[],
+): RenderConfig {
+  return {
+    label,
+    fetch: { assets, params: { exitwhenfull: "true" } },
+    style: {
+      kind: "rgb",
+      channels: [
+        withRescale(band(1), HLS_NORMALIZED_RANGE),
+        withRescale(band(2), HLS_NORMALIZED_RANGE),
+        withRescale(band(3), HLS_NORMALIZED_RANGE),
+      ],
+      alphaBand: 4,
+      adjustments,
+    },
+  };
+}
+
+function hlsCollection(args: {
+  label: string;
+  slug: string;
+  collectionConceptId: string;
+  assetsRegex: string;
+  attribution: string;
+  falseColorNirBand: string;
+}): CollectionConfig {
+  return {
+    label: args.label,
+    slug: args.slug,
+    collectionConceptId: args.collectionConceptId,
+    assetsRegex: args.assetsRegex,
+    backend: "rasterio",
+    minzoom: 5,
+    maxzoom: 13,
+    attribution: args.attribution,
+    date: { mode: "switchable", defaultMode: "month" },
+    queryParams: HLS_QUERY_PARAMS,
+    renders: [
+      hlsRender("True Color", ["B04", "B03", "B02"], HLS_TRUE_COLOR_ADJUSTMENTS),
+      hlsRender(
+        "False Color (NIR)",
+        [args.falseColorNirBand, "B03", "B02"],
+        HLS_FALSE_COLOR_ADJUSTMENTS,
+      ),
+    ],
+  };
+}
+
+function nisarRgbRender(
+  label: string,
+  channels: [StyleExpressionRef, StyleExpressionRef, StyleExpressionRef],
+): RenderConfig {
+  return {
+    label,
+    fetch: {
+      variables: NISAR_GCOV_VARIABLES,
+      params: NISAR_GCOV_COMMON_PARAMS,
+    },
+    style: { kind: "rgb", channels },
+    subLayers: NISAR_GCOV_SUBLAYERS,
+  };
+}
+
 export const DATASETS: DatasetConfig[] = [
   {
     id: "hls",
     label: "HLS (Harmonized Landsat Sentinel-2)",
     collection: [
-      {
+      hlsCollection({
         label: "HLSS30 (Sentinel-2)",
         slug: "hlss30",
         collectionConceptId: "C2021957295-LPCLOUD",
         assetsRegex: "B[0-9][0-9A-Za-z]",
-        backend: "rasterio",
-        minzoom: 5,
-        maxzoom: 13,
         attribution:
           '<a href="https://lpdaac.usgs.gov/products/hlss30v002/" target="_blank">HLS Sentinel-2 (NASA LP DAAC / ESA)</a>',
-        date: { mode: "switchable", defaultMode: "month" },
-        queryParams: [
-          {
-            type: "range",
-            label: "Cloud Cover (%)",
-            key: "cloud_cover",
-            min: 0,
-            max: 100,
-            step: 1,
-            default: [0, 100],
-          },
-          {
-            type: "select",
-            label: "Sort by",
-            key: "sort_key",
-            options: [
-              { label: "Least cloudy", value: "cloud_cover" },
-              { label: "Most recent", value: "-start_date" },
-              { label: "Oldest", value: "start_date" },
-            ],
-            default: "cloud_cover",
-          },
-        ],
-        renders: [
-          {
-            label: "True Color",
-            fetch: {
-              assets: ["B04", "B03", "B02"],
-              params: { exitwhenfull: "true" },
-            },
-            style: {
-              kind: "rgb",
-              channels: [
-                withRescale(band(1), HLS_NORMALIZED_RANGE),
-                withRescale(band(2), HLS_NORMALIZED_RANGE),
-                withRescale(band(3), HLS_NORMALIZED_RANGE),
-              ],
-              alphaBand: 4,
-              adjustments: HLS_TRUE_COLOR_ADJUSTMENTS,
-            },
-          },
-          {
-            label: "False Color (NIR)",
-            fetch: {
-              assets: ["B8A", "B03", "B02"],
-              params: { exitwhenfull: "true" },
-            },
-            style: {
-              kind: "rgb",
-              channels: [
-                withRescale(band(1), HLS_NORMALIZED_RANGE),
-                withRescale(band(2), HLS_NORMALIZED_RANGE),
-                withRescale(band(3), HLS_NORMALIZED_RANGE),
-              ],
-              alphaBand: 4,
-              adjustments: HLS_FALSE_COLOR_ADJUSTMENTS,
-            },
-          },
-        ],
-      },
-      {
+        falseColorNirBand: "B8A",
+      }),
+      hlsCollection({
         label: "HLSL30 (Landsat 8/9)",
         slug: "hlsl30",
         collectionConceptId: "C2021957657-LPCLOUD",
         assetsRegex: "B[0-9][0-9]",
-        minzoom: 5,
-        maxzoom: 13,
-        backend: "rasterio",
         attribution:
           '<a href="https://lpdaac.usgs.gov/products/hlsl30v002/" target="_blank">HLS Landsat (NASA LP DAAC)</a>',
-        date: { mode: "switchable", defaultMode: "month" },
-        queryParams: [
-          {
-            type: "range",
-            label: "Cloud Cover (%)",
-            key: "cloud_cover",
-            min: 0,
-            max: 100,
-            step: 1,
-            default: [0, 100],
-          },
-          {
-            type: "select",
-            label: "Sort by",
-            key: "sort_key",
-            options: [
-              { label: "Least cloudy", value: "cloud_cover" },
-              { label: "Most recent", value: "-start_date" },
-              { label: "Oldest", value: "start_date" },
-            ],
-            default: "cloud_cover",
-          },
-        ],
-        renders: [
-          {
-            label: "True Color",
-            fetch: {
-              assets: ["B04", "B03", "B02"],
-              params: { exitwhenfull: "true" },
-            },
-            style: {
-              kind: "rgb",
-              channels: [
-                withRescale(band(1), HLS_NORMALIZED_RANGE),
-                withRescale(band(2), HLS_NORMALIZED_RANGE),
-                withRescale(band(3), HLS_NORMALIZED_RANGE),
-              ],
-              alphaBand: 4,
-              adjustments: HLS_TRUE_COLOR_ADJUSTMENTS,
-            },
-          },
-          {
-            label: "False Color (NIR)",
-            fetch: {
-              assets: ["B05", "B03", "B02"],
-              params: { exitwhenfull: "true" },
-            },
-            style: {
-              kind: "rgb",
-              channels: [
-                withRescale(band(1), HLS_NORMALIZED_RANGE),
-                withRescale(band(2), HLS_NORMALIZED_RANGE),
-                withRescale(band(3), HLS_NORMALIZED_RANGE),
-              ],
-              alphaBand: 4,
-              adjustments: HLS_FALSE_COLOR_ADJUSTMENTS,
-            },
-          },
-        ],
-      },
+        falseColorNirBand: "B05",
+      }),
     ],
   },
   {
@@ -468,82 +435,26 @@ export const DATASETS: DatasetConfig[] = [
         },
       ],
       renders: [
-        {
-          label: "Balanced Dual-Pol RGB",
-          fetch: {
-            variables: NISAR_GCOV_VARIABLES,
-            params: NISAR_GCOV_COMMON_PARAMS,
-          },
-          style: {
-            kind: "rgb",
-            channels: [
-              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
-              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
-              withRescale(
-                mul(constant(10), log10(div(band(1), band(2)))),
-                [2, 18],
-              ),
-            ],
-          },
-          subLayers: NISAR_GCOV_SUBLAYERS,
-        },
-        {
-          label: "Vegetation / Volume Emphasis",
-          fetch: {
-            variables: NISAR_GCOV_VARIABLES,
-            params: NISAR_GCOV_COMMON_PARAMS,
-          },
-          style: {
-            kind: "rgb",
-            channels: [
-              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
-              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
-              withRescale(
-                mul(constant(10), log10(div(band(1), band(2)))),
-                [2, 18],
-              ),
-            ],
-          },
-          subLayers: NISAR_GCOV_SUBLAYERS,
-        },
-        {
-          label: "Urban / Built Structure Emphasis",
-          fetch: {
-            variables: NISAR_GCOV_VARIABLES,
-            params: NISAR_GCOV_COMMON_PARAMS,
-          },
-          style: {
-            kind: "rgb",
-            channels: [
-              withRescale(
-                mul(constant(10), log10(div(band(1), band(2)))),
-                [2, 18],
-              ),
-              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
-              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
-            ],
-          },
-          subLayers: NISAR_GCOV_SUBLAYERS,
-        },
-        {
-          label: "Water / Smooth Surface Emphasis",
-          fetch: {
-            variables: NISAR_GCOV_VARIABLES,
-            params: NISAR_GCOV_COMMON_PARAMS,
-          },
-          style: {
-            kind: "rgb",
-            channels: [
-              withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
-              withRescale(
-                mul(constant(10), log10(div(band(1), band(2)))),
-                [2, 18],
-              ),
-              withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
-            ],
-          },
-          subLayers: NISAR_GCOV_SUBLAYERS,
-        },
+        nisarRgbRender("Balanced Dual-Pol RGB", [
+          withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+          withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+          withRescale(mul(constant(10), log10(div(band(1), band(2)))), [2, 18]),
+        ]),
+        nisarRgbRender("Vegetation / Volume Emphasis", [
+          withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+          withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+          withRescale(mul(constant(10), log10(div(band(1), band(2)))), [2, 18]),
+        ]),
+        nisarRgbRender("Urban / Built Structure Emphasis", [
+          withRescale(mul(constant(10), log10(div(band(1), band(2)))), [2, 18]),
+          withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+          withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+        ]),
+        nisarRgbRender("Water / Smooth Surface Emphasis", [
+          withRescale(mul(constant(10), log10(band(2))), [-30, 5]),
+          withRescale(mul(constant(10), log10(div(band(1), band(2)))), [2, 18]),
+          withRescale(mul(constant(10), log10(band(1))), [-20, 0]),
+        ]),
         {
           label: "Custom RGB Composite",
           fetch: {

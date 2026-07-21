@@ -16,7 +16,6 @@ describe("url-state", () => {
       r: 4,
       s: "2026-01-01",
       e: "2026-04-01",
-      dm: "range",
       lng: -72.1254,
       lat: 41.2231,
       z: 6.5,
@@ -38,7 +37,6 @@ describe("url-state", () => {
       r: 4,
       s: "2026-01-01",
       e: "2026-04-01",
-      dm: "range",
       lng: -72.1254,
       lat: 41.2231,
       z: 6.5,
@@ -55,16 +53,14 @@ describe("url-state", () => {
 
   it("preserves repeated params during decode", () => {
     window.location.hash =
-      "#d=hls&c=C2021957295-LPCLOUD&r=0&dt=2026-04&lng=0&lat=20&z=2&attribute=a&attribute=b";
+      "#d=hls&c=C2021957295-LPCLOUD&r=0&s=2026-04-01&e=2026-04-30&lng=0&lat=20&z=2&attribute=a&attribute=b";
 
     expect(decodeState()).toEqual({
       d: "hls",
       c: "C2021957295-LPCLOUD",
       r: 0,
-      dt: "2026-04",
-      s: undefined,
-      e: undefined,
-      dm: undefined,
+      s: "2026-04-01",
+      e: "2026-04-30",
       lng: 0,
       lat: 20,
       z: 2,
@@ -77,7 +73,7 @@ describe("url-state", () => {
   });
 
   it("rejects invalid numeric map state", () => {
-    window.location.hash = "#d=hls&c=C2021957295-LPCLOUD&r=0&dt=2026-04&lng=oops&lat=20&z=2";
+    window.location.hash = "#d=hls&c=C2021957295-LPCLOUD&r=0&s=2026-04-01&e=2026-04-30&lng=oops&lat=20&z=2";
 
     expect(decodeState()).toBeNull();
   });

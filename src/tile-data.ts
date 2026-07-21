@@ -15,7 +15,6 @@ export type NdArrayTile = {
   data: SupportedTileArray;
   dtype: DType;
   shape: number[];
-  fortranOrder: boolean;
   width: number;
   height: number;
   bandCount: number;
@@ -37,30 +36,35 @@ function isSupportedTileArray(value: ArrayBufferView): value is SupportedTileArr
   );
 }
 
-function makeTileArray(dtype: DType, values: number[]): SupportedTileArray {
+function makeTileArray(dtype: DType, length: number): SupportedTileArray {
   switch (dtype) {
     case "u1":
-      return Uint8Array.from(values);
+      return new Uint8Array(length);
     case "i1":
-      return Int8Array.from(values);
+      return new Int8Array(length);
     case "u2":
-      return Uint16Array.from(values);
+      return new Uint16Array(length);
     case "i2":
-      return Int16Array.from(values);
+      return new Int16Array(length);
     case "u4":
-      return Uint32Array.from(values);
+      return new Uint32Array(length);
     case "i4":
-      return Int32Array.from(values);
+      return new Int32Array(length);
     case "f4":
-      return Float32Array.from(values);
+      return new Float32Array(length);
     case "f8":
-      return Float64Array.from(values);
+      return new Float64Array(length);
     default:
       throw new Error(`Unsupported ndarray dtype for assembly: ${dtype}`);
   }
 }
 
-function getBandValues(tile: NdArrayTile, bandIndex: number): number[] {
+function copyBandValues(
+  target: SupportedTileArray,
+  targetOffset: number,
+  tile: NdArrayTile,
+  bandIndex: number,
+): void {
   const pixelCount = tile.width * tile.height;
 
   if (tile.shape.length === 2) {
@@ -69,7 +73,8 @@ function getBandValues(tile: NdArrayTile, bandIndex: number): number[] {
         `Tile shape ${JSON.stringify(tile.shape)} does not expose band index ${bandIndex}.`,
       );
     }
-    return Array.from(tile.data, (value) => Number(value));
+    target.set(tile.data, targetOffset);
+    return;
   }
 
   if (tile.shape.length === 3) {
@@ -79,10 +84,8 @@ function getBandValues(tile: NdArrayTile, bandIndex: number): number[] {
       );
     }
     const bandOffset = bandIndex * pixelCount;
-    return Array.from(
-      tile.data.slice(bandOffset, bandOffset + pixelCount),
-      (value) => Number(value),
-    );
+    target.set(tile.data.subarray(bandOffset, bandOffset + pixelCount), targetOffset);
+    return;
   }
 
   throw new Error(`Unsupported tile shape for band extraction: ${JSON.stringify(tile.shape)}.`);
@@ -127,7 +130,6 @@ export async function decodeNpyTile(
     data: parsed.data,
     dtype: parsed.dtype,
     shape: [...parsed.shape],
-    fortranOrder: parsed.fortranOrder,
     width,
     height,
     bandCount,
@@ -161,49 +163,40 @@ export function assembleBandTiles(tiles: NdArrayTile[]): NdArrayTile {
     );
   }
 
+  const pixelCount = width * height;
   const dtypes = new Set(tiles.map((tile) => tile.dtype));
   const dtype = dtypes.size === 1 ? first.dtype : "f4";
-  const dataBands = tiles.map((tile) => getBandValues(tile, 0));
   const allHaveSharedAlpha = tiles.every((tile) => tile.bandCount === 2);
-  const alphaBand = allHaveSharedAlpha
-    ? tiles
-        .map((tile) => getBandValues(tile, 1))
-        .reduce((composite, band) => composite.map((value, index) => Math.min(value, band[index])))
-    : null;
-  const values = allHaveSharedAlpha
-    ? [...dataBands.flat(), ...alphaBand!]
-    : dataBands.flat();
-  const data = makeTileArray(dtype, values);
-  const bandCount = dataBands.length + (allHaveSharedAlpha ? 1 : 0);
+  const bandCount = tiles.length + (allHaveSharedAlpha ? 1 : 0);
+  const data = makeTileArray(dtype, bandCount * pixelCount);
+
+  tiles.forEach((tile, index) => {
+    copyBandValues(data, index * pixelCount, tile, 0);
+  });
+
+  if (allHaveSharedAlpha) {
+    const alphaOffset = tiles.length * pixelCount;
+    copyBandValues(data, alphaOffset, tiles[0], 1);
+    for (const tile of tiles.slice(1)) {
+      const bandOffset = tile.shape.length === 3 ? pixelCount : 0;
+      for (let index = 0; index < pixelCount; index++) {
+        data[alphaOffset + index] = Math.min(
+          Number(data[alphaOffset + index]),
+          Number(tile.data[bandOffset + index]),
+        );
+      }
+    }
+  }
 
   return {
     data,
     dtype,
     shape: bandCount === 1 ? [height, width] : [bandCount, height, width],
-    fortranOrder: false,
     width,
     height,
     bandCount,
     byteLength: data.byteLength,
   };
-}
-
-export function toGpuUploadArray(tile: NdArrayTile): Uint8Array | Float32Array {
-  if (tile.data instanceof Float32Array || tile.data instanceof Uint8Array) {
-    return tile.data;
-  }
-
-  if (
-    tile.data instanceof Uint16Array ||
-    tile.data instanceof Int16Array ||
-    tile.data instanceof Float64Array ||
-    tile.data instanceof Uint32Array ||
-    tile.data instanceof Int32Array
-  ) {
-    return Float32Array.from(tile.data, (value) => Number(value));
-  }
-
-  return Uint8Array.from(tile.data, (value) => Number(value) & 0xff);
 }
 
 export function createBandTextures(

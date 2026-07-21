@@ -17,7 +17,6 @@ export type ParamValue = string | string[];
 export type ParamBag = Record<string, ParamValue>;
 
 export type RawBandRequestSpec = {
-  bandKey: string;
   bandRef: string;
   /** bandRequestKey changes only when one fetchable raw band tile would change. */
   bandRequestKey: string;
@@ -249,19 +248,16 @@ function buildRawBandRequests(args: {
 }): RawBandRequestSpec[] {
   const bandRefs = args.backend === "rasterio" ? args.assets ?? [] : args.variables ?? [];
 
-  return bandRefs.map((bandRef, index) => {
-    const bandKey = bandRef;
+  return bandRefs.map((bandRef) => {
     const bandPayload = {
       backend: args.backend,
       collectionConceptId: args.collectionConceptId,
       datetime: args.datetime,
-      bandKey,
       bandRef,
       params: args.params,
     };
 
     return {
-      bandKey,
       bandRef,
       bandRequestKey: stableSerialize(bandPayload),
     };

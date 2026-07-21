@@ -7,7 +7,6 @@ function makeCachedBandTile(value: number): CachedBandTile {
       data: new Uint8Array([value, value, value, value]),
       dtype: "u1",
       shape: [2, 2],
-      fortranOrder: false,
       width: 2,
       height: 2,
       bandCount: 1,
@@ -20,11 +19,11 @@ describe("band-cache", () => {
   it("returns an existing tile on cache hit", async () => {
     const cache = createBandTileCache();
     const value = makeCachedBandTile(7);
+    const loader = vi.fn(async () => value);
 
-    cache.set("band-key", value);
-
-    await expect(cache.getOrLoad("band-key", vi.fn())).resolves.toBe(value);
-    expect(cache.get("band-key")).toBe(value);
+    await expect(cache.getOrLoad("band-key", loader)).resolves.toBe(value);
+    await expect(cache.getOrLoad("band-key", loader)).resolves.toBe(value);
+    expect(loader).toHaveBeenCalledOnce();
   });
 
   it("coalesces concurrent getOrLoad calls for the same key", async () => {

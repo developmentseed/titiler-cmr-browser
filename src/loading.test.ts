@@ -40,7 +40,7 @@ describe("loading", () => {
 
     expect(document.getElementById("loading")?.classList.contains("visible")).toBe(true);
 
-    tracker.finish?.("ok");
+    tracker.finish?.();
 
     expect(document.getElementById("loading")?.classList.contains("visible")).toBe(false);
   });
