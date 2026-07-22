@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/titiler-cmr-browser/",
+  base: process.env.BASE_PATH ?? "/titiler-cmr-browser/",
 });

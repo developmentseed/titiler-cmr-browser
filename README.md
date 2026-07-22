@@ -28,7 +28,6 @@ npm run dev       # start dev server
 npm test          # run Vitest unit tests
 npm run build     # TypeScript check + Vite production build
 npm run preview   # preview production build locally
-npm run deploy    # build and push dist/ to gh-pages branch
 ```
 
 ## Architecture
@@ -57,6 +56,8 @@ Raster rendering now flows through deck.gl `RasterTileLayer` instances hosted in
 Because `@developmentseed/deck.gl-raster` does not yet implement Globe-view bounding volumes, the app falls back to Mercator whenever a raster deck layer is visible.
 
 The titiler-cmr endpoint is configured in `src/config.ts` as `TITILER_ENDPOINT`. Swap this value to point at a different environment.
+
+GitHub Pages deploys from release artifacts. Release Please opens the release PR on pushes to `main`; publishing that release triggers the Pages workflow.
 
 ## Adding a Dataset
 

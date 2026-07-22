@@ -8,8 +8,7 @@
     "build": "tsc && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@deck.gl/core": "^9.3.2",
@@ -22,7 +21,6 @@
     "npyjs": "^1.1.0"
   },
   "devDependencies": {
-    "gh-pages": "^6.3.0",
     "jsdom": "^29.1.1",
     "typescript": "^5.7.2",
     "vite": "^6.3.1",
